@@ -9,8 +9,10 @@ ez = np.array((0, 0, 1), dtype=np.int32)
 
 class SurfaceGeneratedSEM(object):
     '''
-    
-    
+    The instance of this class is an isoparametric surface
+    based on a nurbs surface. The nurbs surface provides the coordinates
+    of nodal points. Then everything else will be calculated according to 
+    the isoparametric assumptions.   
     
     '''
     def __init__(self, nurbs_parent_surface, lobatto_pw, node_1_ub,\
@@ -85,6 +87,8 @@ class SurfaceGeneratedSEM(object):
             v = 1/2*((1-xi2)*node_1_v + (1+xi2)*node_3_v)
         return u, v
     
+    
+    
     def physical_crd_xi(self, xi1, xi2, node_1_u, node_1_v,\
                     node_3_u, node_3_v, t=0):
         u = self.xi_to_uv(xi1, xi2, node_1_u, node_1_v, node_3_u, node_3_v)[0]
@@ -94,6 +98,7 @@ class SurfaceGeneratedSEM(object):
         y = physical_coor_var[1]
         z = physical_coor_var[2]
         return x, y, z
+        
         
         
     def nodes_physical_coordinate(self):
@@ -115,6 +120,7 @@ class SurfaceGeneratedSEM(object):
                 nodes_coor_mtx[i, j, 1] = physical_coor_local[1]
                 nodes_coor_mtx[i, j, 2] = physical_coor_local[2]         
         return nodes_coor_mtx
+
 
    
     def coorsys_director_tanvec_allnodes(self):
@@ -177,13 +183,14 @@ class SurfaceGeneratedSEM(object):
         xi3, lag_xi1, lag_xi2, der_lag_dxi1, der_lag_dxi2):
         '''
         In this method, the Jacobian matrix is calculated. Unlike our developed
-        method, in isoparametric elements, we need the director vectors at
-        all nodes to iterpolate it, which is necessary for calculation of the
+        SEMN method, in isoparametric elements we need the director vectors at
+        all nodes to interpolate it, which is necessary for calculation of the
         derivatives of the director at a specific point. This is the reason that
         the coorsys_tanvec_matx which is calculated from 
         "coorsys_director_tanvec_allnodes" method is imported.
         -Output:
-        A 3x3 np.array which is Jacobian matrix.
+        A 3x3 np.array which is Jacobian matrix at j = row_num and i = col-num
+        element node (i, j).
         
         '''
         vdir_unit = coorsys_tanvec_mtx[row_num, col_num, 2]
@@ -220,6 +227,7 @@ class SurfaceGeneratedSEM(object):
         jac = np.array(((dx_dxi1, dy_dxi1, dz_dxi1),(dx_dxi2, dy_dxi2, dz_dxi2),\
                (dx_dxi3, dy_dxi3, dz_dxi3)))    
         return jac 
+    
     
     
     def curvature_mtx(self, coorsys_tanvec_mtx, row_num, col_num,\
@@ -263,6 +271,8 @@ class SurfaceGeneratedSEM(object):
         gauss_crv = -np.linalg.det(crv_tnsr) / np.linalg.det(metric_tnsr)
         
         return  gauss_crv
+    
+    
         
     def curvature_mtx_exact(self, coorsys_tanvec_mtx, row_num, col_num,\
          lag_xi1, lag_xi2, der_lag_dxi1, der_lag_dxi2, der2_lag_dxi1, der2_lag_dxi2):
@@ -333,41 +343,12 @@ class SurfaceGeneratedSEM(object):
         gauss_crv = -np.linalg.det(crv_tnsr) / np.linalg.det(metric_tnsr)
         
         return gauss_crv
-        
-                
-        # dvdir_unit_dxi1 = np.zeros(3)
-        # dvdir_unit_dxi2 = np.zeros(3)
-        # # with open('director_unit_isoprm.dat', 'a') as du:
-        # #     np.savetxt(du, coorsys_tanvec_mtx[row_num, col_num, 2])
-        # #     # du.write('\n')
-        # for i in range(dim):
-        #     for j in range(dim):
-        #         dvdir_unit_dxi1 = dvdir_unit_dxi1 + \
-        #             np.array([der_lag_dxi1[j] * lag_xi2[i] * coorsys_tanvec_mtx[i, j, 2, 0],\
-        #                     der_lag_dxi1[j] * lag_xi2[i] * coorsys_tanvec_mtx[i, j, 2, 1],\
-        #                         der_lag_dxi1[j] * lag_xi2[i] * coorsys_tanvec_mtx[i, j, 2, 2]])
-        #         dvdir_unit_dxi2 = dvdir_unit_dxi2 +\
-        #             np.array([lag_xi1[j] * der_lag_dxi2[i] * coorsys_tanvec_mtx[i, j, 2, 0],\
-        #                 lag_xi1[j] * der_lag_dxi2[i] * coorsys_tanvec_mtx[i, j, 2, 1],\
-        #                 lag_xi1[j] * der_lag_dxi2[i] * coorsys_tanvec_mtx[i, j, 2, 2]])
-        
-        # crv_tnsr = 1/2 * np.array([[  2*np.dot(dvdir_unit_dxi1, g1),\
-        #                             np.dot(dvdir_unit_dxi1, g2) + np.dot(dvdir_unit_dxi2, g1)],\
-        #                             [np.dot(dvdir_unit_dxi1, g2) + np.dot(dvdir_unit_dxi2, g1),\
-        #                                 2*np.dot(dvdir_unit_dxi2, g2)]])
-        
-        # metric_tnsr = np.array([[np.dot(g1, g1), np.dot(g1, g2)],\
-        #                         [np.dot(g1, g2), np.dot(g2, g2)]])
-        
-        # gauss_crv = -np.linalg.det(crv_tnsr) / np.linalg.det(metric_tnsr)
-        
-        return  gauss_crv
+            
     
     
     def area(self):
         '''This function is only for the test of the 
         validity of derivatives of mapping and jacobian'''
-        node_coor  = self.nodes_physical_coordinate()
         coorsys_tanvec_mtx = self.coorsys_director_tanvec_allnodes()
         dim = self.lobatto_pw.shape[0]
         local_area = 0
@@ -385,8 +366,7 @@ class SurfaceGeneratedSEM(object):
                 vector_1 = jac_mtx[0,:]
                 vector_2 = jac_mtx[1,:]
                 local_area = local_area +\
-                    np.linalg.norm((np.cross(vector_1,vector_2)))* w1 * w2
-                                
+                    np.linalg.norm((np.cross(vector_1,vector_2))) * w1 * w2                         
         return  local_area 
     
     
@@ -446,8 +426,8 @@ if __name__=="__main__":
     node_3_vb = 1
     surf_lag = SurfaceGeneratedSEM(nurbs_surface, lobatto_pw, node_1_ub,\
                   node_1_vb, node_3_ub, node_3_vb)
-    pp = surf_lag.physical_crd_xi(0.5, 0.5, 0, 0, 1, 1)
-    print(pp)
+    print(surf_lag.coorsys_director_tanvec_allnodes())
+    
     print(surf_lag.area())
     nodal_coor = surf_lag.nodes_physical_coordinate()
     with open("coor_lobp.dat", 'w') as cl:

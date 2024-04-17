@@ -1,6 +1,20 @@
 import numpy as np
 
 
+def lbto_pw(data_file_address):
+    '''This function gets the data from
+    Mathematica provided .dat file. The data is 
+    lobatto (lbto) points and weights of numeriucal integration
+    -output:
+    a 2D np.array in that first column is the 
+    spectral node coordinates and the second column 
+    is the ascociated weights
+    '''
+    node_data = np.genfromtxt(data_file_address)
+    return node_data
+
+
+
 def lagfunc(lobatto_pw, xi):
     '''
     Function for generating lagrangian
