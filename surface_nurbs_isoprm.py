@@ -412,7 +412,7 @@ if __name__=="__main__":
     nurbs_surface = sgs.SurfaceGeo(data, 0, thk)
     
     lobatto_pw_all = lagd.lbto_pw("node_weight_all.dat")
-    i_main = 12
+    i_main = 3
     if i_main == 1:
         lobatto_pw = lobatto_pw_all[1:3,:]
     else:  
@@ -422,72 +422,73 @@ if __name__=="__main__":
     dim = lobatto_pw.shape[0]
     node_1_ub = 0
     node_1_vb = 0
-    node_3_ub = 1
-    node_3_vb = 1
+    node_3_ub = 0.5
+    node_3_vb = 0.5
     surf_lag = SurfaceGeneratedSEM(nurbs_surface, lobatto_pw, node_1_ub,\
                   node_1_vb, node_3_ub, node_3_vb)
-    print(surf_lag.coorsys_director_tanvec_allnodes())
+    # print(surf_lag.coorsys_director_tanvec_allnodes())
     
-    print(surf_lag.area())
-    nodal_coor = surf_lag.nodes_physical_coordinate()
-    with open("coor_lobp.dat", 'w') as cl:
-        pass
-    for i in range(i_main+1):
-        for j in range(i_main+1):
-            with open("coor_lobp.dat", 'a') as cl:
-                np.savetxt(cl, nodal_coor[i, j])
+    # print(surf_lag.area())
+    # nodal_coor = surf_lag.nodes_physical_coordinate()
+    # with open("coor_lobp.dat", 'w') as cl:
+    #     pass
+    # for i in range(i_main+1):
+    #     for j in range(i_main+1):
+    #         with open("coor_lobp.dat", 'a') as cl:
+    #             np.savetxt(cl, nodal_coor[i, j])
                 
                 
                 
-    with open("coor_lobp_left_line.dat", 'w') as cl:
-        pass
-    coor_lbp_left_line = np.zeros((dim, 4))
-    nodal_coor = surf_lag.nodes_physical_coordinate()
-    j = 0
-    for i in range(dim-1, -1, -1): #(14, 13, 12,..., 1, 0)
-        coor_lbp_left_line[j, :] = [j + 1, nodal_coor[0, i, 0], nodal_coor[0, i, 1], nodal_coor[0, i, 2]]
-        j += 1
+    # with open("coor_lobp_left_line.dat", 'w') as cl:
+    #     pass
+    # coor_lbp_left_line = np.zeros((dim, 4))
+    # nodal_coor = surf_lag.nodes_physical_coordinate()
+    # j = 0
+    # for i in range(dim-1, -1, -1): #(14, 13, 12,..., 1, 0)
+    #     coor_lbp_left_line[j, :] = [j + 1, nodal_coor[0, i, 0], nodal_coor[0, i, 1], nodal_coor[0, i, 2]]
+    #     j += 1
  
-    with open("coor_lobp_left_line.dat", 'a') as cl:
-            np.savetxt(cl, coor_lbp_left_line)
+    # with open("coor_lobp_left_line.dat", 'a') as cl:
+    #         np.savetxt(cl, coor_lbp_left_line)
                 
                 
-    with open("coor_cp.dat",'w') as cp:
-        pass
-    cp_number_u = nurbs_surface.cp_size_u
-    cp_number_v = nurbs_surface.cp_size_v
-    cp_coor = nurbs_surface.cpw_3d
+    # with open("coor_cp.dat",'w') as cp:
+    #     pass
+    # cp_number_u = nurbs_surface.cp_size_u
+    # cp_number_v = nurbs_surface.cp_size_v
+    # cp_coor = nurbs_surface.cpw_3d
     
-    for i in range(cp_number_v): #For generating a surface in Mathematica
-            with open('coor_cp.dat','a') as cp:
-                np.savetxt(cp, cp_coor[i], newline = '\n')
-    with open("coor_cp_left_line.dat","w"):
-        pass
-    with open("coor_cp_left_line.dat", "a") as cp: # For generating the left curve of the surface.
-        np.savetxt(cp, cp_coor[0, :])
+    # for i in range(cp_number_v): #For generating a surface in Mathematica
+    #         with open('coor_cp.dat','a') as cp:
+    #             np.savetxt(cp, cp_coor[i], newline = '\n')
+    # with open("coor_cp_left_line.dat","w"):
+    #     pass
+    # with open("coor_cp_left_line.dat", "a") as cp: # For generating the left curve of the surface.
+    #     np.savetxt(cp, cp_coor[0, :])
         
                 
     coorsys_tanvec_mtx = surf_lag.coorsys_director_tanvec_allnodes()
-    dim = lobatto_pw.shape[0]
-    xi3 = 0
-    with open("jacobian_isoprm.dat", "w") as f:
-        pass
+    print(coorsys_tanvec_mtx)
+    # dim = lobatto_pw.shape[0]
+    # xi3 = 0
+    # with open("jacobian_isoprm.dat", "w") as f:
+    #     pass
     
-    for i in range(dim):
-            xi2 = surf_lag.lobatto_pw[i, 0]
-            w2 = surf_lag.lobatto_pw[i, 1]
-            lag_xi2 = lagd.lagfunc(surf_lag.lobatto_pw, xi2)
-            der_lag_dxi2 = lagd.der_lagfunc_dxi(surf_lag.lobatto_pw, xi2)   
-            for j in range(dim):
-                xi1 = surf_lag.lobatto_pw[j, 0]
-                w1 = surf_lag.lobatto_pw[j, 1]
-                lag_xi1 = lagd.lagfunc(surf_lag.lobatto_pw, xi1)
-                der_lag_dxi1 = lagd.der_lagfunc_dxi(surf_lag.lobatto_pw, xi1)
-                jac_mtx = surf_lag.jacobian_mtx( coorsys_tanvec_mtx, i, j, xi3,\
-                    lag_xi1, lag_xi2, der_lag_dxi1, der_lag_dxi2)
-                with open ('jacobian_isoprm.dat', 'a') as jac_file:
-                    np.savetxt(jac_file, jac_mtx)
-                    jac_file.write("\n")
+    # for i in range(dim):
+    #         xi2 = surf_lag.lobatto_pw[i, 0]
+    #         w2 = surf_lag.lobatto_pw[i, 1]
+    #         lag_xi2 = lagd.lagfunc(surf_lag.lobatto_pw, xi2)
+    #         der_lag_dxi2 = lagd.der_lagfunc_dxi(surf_lag.lobatto_pw, xi2)   
+    #         for j in range(dim):
+    #             xi1 = surf_lag.lobatto_pw[j, 0]
+    #             w1 = surf_lag.lobatto_pw[j, 1]
+    #             lag_xi1 = lagd.lagfunc(surf_lag.lobatto_pw, xi1)
+    #             der_lag_dxi1 = lagd.der_lagfunc_dxi(surf_lag.lobatto_pw, xi1)
+    #             jac_mtx = surf_lag.jacobian_mtx( coorsys_tanvec_mtx, i, j, xi3,\
+    #                 lag_xi1, lag_xi2, der_lag_dxi1, der_lag_dxi2)
+    #             with open ('jacobian_isoprm.dat', 'a') as jac_file:
+    #                 np.savetxt(jac_file, jac_mtx)
+    #                 jac_file.write("\n")
     print("End")
     
     
