@@ -53,12 +53,12 @@ def initiate_nodal_coorsys_histmtx(surface, lobatto_pw, element_boundaries_u,\
 
 
 
-def make_displ_hist(lobatto_pw, number_element_u, number_element_v, \
-                   displ_compl, hist_mtx):
+def update_displ_hist(lobatto_pw, number_element_u, number_element_v, \
+                   displ_compl, hist_displ_mtx):
     '''
     This functin takes the number of elements,
     complete displacement vector (displ_compl) and complete history 
-    matrix of deformation matrix (hist_mtx) and update the
+    matrix of deformation matrix (hist_displ_mtx) and update the
     hist_mtx according to new displ_mtx calculated at each 
     step. In addition to the displacement increment which can be directly added 
     to the previous displacement vector, it extracts the beta_1 and beta_2 increment
@@ -95,37 +95,37 @@ def make_displ_hist(lobatto_pw, number_element_u, number_element_v, \
             connec_index = 0
             for m in range(dim):
                 for n in range(dim): 
-                    hist_mtx[i_main, j_main, m, n, 3, 0] = \
-                        hist_mtx[i_main, j_main, m, n, 3, 0] + \
+                    hist_displ_mtx[i_main, j_main, m, n, 3, 0] = \
+                        hist_displ_mtx[i_main, j_main, m, n, 3, 0] + \
                             displ_compl[connectivity[connec_index]]
-                    hist_mtx[i_main, j_main, m, n, 3, 1] = \
-                        hist_mtx[i_main, j_main, m, n, 3, 1] + \
+                    hist_displ_mtx[i_main, j_main, m, n, 3, 1] = \
+                        hist_displ_mtx[i_main, j_main, m, n, 3, 1] + \
                             displ_compl[connectivity[connec_index + 1]]
-                    hist_mtx[i_main, j_main, m, n, 3, 2] = \
-                        hist_mtx[i_main, j_main, m, n, 3, 2] + \
+                    hist_displ_mtx[i_main, j_main, m, n, 3, 2] = \
+                        hist_displ_mtx[i_main, j_main, m, n, 3, 2] + \
                             displ_compl[connectivity[connec_index + 2]]
                                             
                     betha_1 = displ_compl[connectivity[connec_index + 3]]
                     betha_2 = displ_compl[connectivity[connec_index + 4]]
                     beta_vector = np.array([betha_1, betha_2])
-                    omega_1_prv = hist_mtx[i_main, j_main, m, n, 4, 0]
-                    omega_2_prv = hist_mtx[i_main, j_main, m, n, 4, 1]
-                    omega_3_prv = hist_mtx[i_main, j_main, m, n, 4, 2]
+                    omega_1_prv = hist_displ_mtx[i_main, j_main, m, n, 4, 0]
+                    omega_2_prv = hist_displ_mtx[i_main, j_main, m, n, 4, 1]
+                    omega_3_prv = hist_displ_mtx[i_main, j_main, m, n, 4, 2]
                     omega_prv_step_vector =\
                         np.array([omega_1_prv, omega_2_prv, omega_3_prv])
-                    a_0_1 = hist_mtx[i_main, j_main, m, n, 0]
-                    a_0_2 = hist_mtx[i_main, j_main, m, n, 1]
+                    a_0_1 = hist_displ_mtx[i_main, j_main, m, n, 0]
+                    a_0_2 = hist_displ_mtx[i_main, j_main, m, n, 1]
                     delta_omega_vector = beta_to_deltaomega(a_0_1, a_0_2, omega_prv_step_vector, beta_vector)             
                     
-                    hist_mtx[i_main, j_main, m, n, 4, 0] = \
-                        hist_mtx[i_main, j_main, m, n, 4, 0] + delta_omega_vector[0]
-                    hist_mtx[i_main, j_main, m, n, 4, 1] = \
-                        hist_mtx[i_main, j_main, m, n, 4, 1] + delta_omega_vector[1]
-                    hist_mtx[i_main, j_main, m, n, 4, 2] = \
-                        hist_mtx[i_main, j_main, m, n, 4, 2] + delta_omega_vector[2]
+                    hist_displ_mtx[i_main, j_main, m, n, 4, 0] = \
+                        hist_displ_mtx[i_main, j_main, m, n, 4, 0] + delta_omega_vector[0]
+                    hist_displ_mtx[i_main, j_main, m, n, 4, 1] = \
+                        hist_displ_mtx[i_main, j_main, m, n, 4, 1] + delta_omega_vector[1]
+                    hist_displ_mtx[i_main, j_main, m, n, 4, 2] = \
+                        hist_displ_mtx[i_main, j_main, m, n, 4, 2] + delta_omega_vector[2]
                         
                     connec_index = connec_index + 5
-    return hist_mtx
+    return hist_displ_mtx
             
                     
     
@@ -257,7 +257,7 @@ if __name__ == "__main__":
         5.41657083e-03])
     print("history matrix is:", hist_mtx)
     print("displacement:", displ_compl) 
-    update_hist_mtx = make_displ_hist(lobatto_pw, number_element_u, number_element_v, \
+    update_hist_mtx = update_displ_hist(lobatto_pw, number_element_u, number_element_v, \
                    displ_compl, hist_mtx)
     # print(displ_compl.shape[0])
     

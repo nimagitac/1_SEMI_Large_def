@@ -43,15 +43,15 @@ print("\nEnter the order of continuity at knots to be used for auto detection of
 print("The default value is '1'")
 c_order_v =int(input())
 
-j_main = min_order_elem
-while j_main <= max_order_elem:
-    if j_main==1:
+i_main = min_order_elem
+while i_main <= max_order_elem:
+    if i_main==1:
         lobatto_pw = lobatto_pw_all[1:3,:]
     else:
-        index = np.argwhere(lobatto_pw_all==j_main)
+        index = np.argwhere(lobatto_pw_all==i_main)
         lobatto_pw = lobatto_pw_all[index[0, 0] + 1:\
-                            index[0, 0] + (j_main+1) + 1, :]
-    i_main = min_number_elem
+                            index[0, 0] + (i_main+1) + 1, :]
+    j_main = min_number_elem
     # elemnum_displm_array = np.zeros((max_number_elem - min_number_elem + 1, 2))
     # time_assembling = np.zeros((max_number_elem - min_number_elem + 1, 2))
     # time_solver = np.zeros((max_number_elem - min_number_elem + 1, 2))
@@ -60,12 +60,12 @@ while j_main <= max_order_elem:
     # dof_time_solver = np.zeros((max_number_elem - min_number_elem + 1, 2)) 
     # cond_elem =np.zeros((max_number_elem - min_number_elem + 1, 2)) 
     elemnum_counter = 0
-    while i_main <= max_number_elem:
+    while j_main <= max_number_elem:
         print("\n\n\nNumber of elements manually given in u and v: {}    Order of elements: {} ".\
-            format(str(i_main)+'x'+str(i_main), j_main))
+            format(str(j_main)+'x'+str(j_main), i_main))
         print("\nProgram starts to generate mesh according to continuity at knots and manual input of number of elements ...") 
-        u_manual = np.linspace(0, 1, i_main + 1) #np.linspace(a, b, c) divide line ab to c-1 parts or add c points to it.
-        v_manual = np.linspace(0, 1, i_main + 1)
+        u_manual = np.linspace(0, 1, j_main + 1) #np.linspace(a, b, c) divide line ab to c-1 parts or add c points to it.
+        v_manual = np.linspace(0, 1, j_main + 1)
         mesh = gsm.mesh_func(surfs, u_manual, v_manual, c_order_u, c_order_v)
         element_boundaries_u = mesh[0]
         element_boundaries_v = mesh[1]
@@ -85,7 +85,8 @@ while j_main <= max_order_elem:
         node_global_d = node_global_c + number_node_one_row - 1
         total_dof = node_global_d * 5
         displm_complete = np.zeros(total_dof)
-        hist_node_displ_rot = np.zeros([i_main, i_main, j_main+1, j_main+1, 5, 3]) #To record the history of deformation. Dimensions are: number of elment in u and v, number of nodes in xi1 and xi2, (5 for A_1, A_2, A_3, u, omega) each has 3 components.
+        jacobian_all_node = np.zeros((j_main, j_main, i_main + 1, i_main + 1, 3, 3)) #To avoide multiple calculation of Jacobian matrix, the Value of 
+        hist_node_displ_rot = np.zeros((j_main, j_main, i_main + 1, i_main + 1, 5, 3)) #To record the history of deformation. Dimensions are: number of elment in u and v, number of nodes in xi1 and xi2, (5 for A_1, A_2, A_3, u, omega) each has 3 components.
         
                             
         
@@ -140,10 +141,10 @@ while j_main <= max_order_elem:
         # dof_time_assembling [elemnum_counter] = [n_dimension_bc, t_2_assembling - t_1_assembling] 
         # dof_time_solver [elemnum_counter] = [n_dimension_bc, t_2_solver - t_1_solver]
         # if j_main == max_order_elem:###############
-        if j_main in [6, 7, 8]:
-            cond_elem[elemnum_counter] = [i_main, np.linalg.cond(k_global_bc)]
+        if i_main in [6, 7, 8]:
+            cond_elem[elemnum_counter] = [j_main, np.linalg.cond(k_global_bc)]
         elemnum_counter +=1
-        i_main += 1
+        j_main += 1
     # np.savetxt(f'scordelis_h_ref_displm_p_{j_main}.dat', elemnum_displm_array)
     # np.savetxt(f'scordelis_h_ref_asmtime_p_{j_main}.dat', time_assembling)
     # np.savetxt(f'scordelis_h_ref_solvertime_p_{j_main}.dat', time_solver)
@@ -151,9 +152,9 @@ while j_main <= max_order_elem:
     # np.savetxt(f'scordelis_h_ref_asmtime_dof_p_{j_main}.dat', dof_time_assembling)
     # np.savetxt(f'scordelis_h_ref_solvertime_dof_p_{j_main}.dat', dof_time_solver)
     # if j_main == max_order_elem:
-    if j_main in [6, 7, 8]:
-            np.savetxt(f'scordelis_h_ref_cond_elem_p_{j_main}.dat', cond_elem)
-    j_main += 1
+    if i_main in [6, 7, 8]:
+            np.savetxt(f'scordelis_h_ref_cond_elem_p_{i_main}.dat', cond_elem)
+    i_main += 1
     # f_global = glv.global_load_vector(surfs, lobatto_pw, element_boundaries_u, element_boundaries_v)
     # f_global_bc = glv.load_vector_bc_applied(f_global, bc)
     # d = np.linalg.
