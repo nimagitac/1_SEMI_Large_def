@@ -85,7 +85,7 @@ while j_main <= max_order_elem:
         node_global_d = node_global_c + number_node_one_row - 1
         total_dof = node_global_d * 5
         displm_complete = np.zeros(total_dof)
-        hist_node_displ_rot = np.zeros([i_main, i_main, j_main, j_main, 5, 3]) #To record the history of deformation. Dimensions are: number of elment in u and v, number of nodes in xi1 and xi2, (5 for A_1, A_2, A_3, u, omega) each has 3 components.
+        hist_node_displ_rot = np.zeros([i_main, i_main, j_main+1, j_main+1, 5, 3]) #To record the history of deformation. Dimensions are: number of elment in u and v, number of nodes in xi1 and xi2, (5 for A_1, A_2, A_3, u, omega) each has 3 components.
         
                             
         
