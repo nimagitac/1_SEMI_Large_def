@@ -14,7 +14,7 @@ def r_mtx_i(omega_vector_i):
     See:
     Eq.(18) of
     "A robust non-linear mixed hybrid quadrilateral shell element, 2005
-    W. Wagner1, and F. Gruttmann"
+    W. Wagner, and F. Gruttmann"
     '''
     omega_norm = np.linalg.norm(omega_vector_i)
     skew_omega = skew(omega_vector_i)
@@ -39,7 +39,7 @@ def t_3_mtx( a_t_1, a_t_2):
     t_3 = np.array([[a_t_1[0], a_t_2[0]], [a_t_1[1], a_t_2[1]], [a_t_1[2], a_t_2[2]]])
     return t_3
 
-def t_mtx_i (omega_vector_i, initial_nodal_coorsys_i, intersection = "false"):
+def t_mtx_i (omega_vector_i, nodes_coorsys_displ_i, intersection = "false"):
     """
     In this function, T_I in first variation of the director vector of shell at 
     the nodal point "i" is calculated.
@@ -57,9 +57,9 @@ def t_mtx_i (omega_vector_i, initial_nodal_coorsys_i, intersection = "false"):
     skew_omega = skew(omega_vector_i)
     skew_omega_p2 = skew_omega @ skew_omega
     if intersection == "false":
-        a_0_1 = initial_nodal_coorsys_i[0]
-        a_0_2 = initial_nodal_coorsys_i[1]
-        a_0_3 = initial_nodal_coorsys_i[2]
+        a_0_1 = nodes_coorsys_displ_i[0]
+        a_0_2 = nodes_coorsys_displ_i[1]
+        a_0_3 = nodes_coorsys_displ_i[2]
         vdir_0 = a_0_3
         
         omega_norm = np.linalg.norm(omega_vector_i)
@@ -80,8 +80,7 @@ def t_mtx_i (omega_vector_i, initial_nodal_coorsys_i, intersection = "false"):
             tc_1 = (1-np.cos(omega_norm)) / omega_norm**2
             tc_2 = (omega_norm - np.sin(omega_norm)) / omega_norm**3
             
-        h_capt = unit_mtx + tc_1*skew_omega + tc_2*skew_omega_p2
-        print(h_capt)
+        h_capt = unit_mtx + tc_1 * skew_omega + tc_2 * skew_omega_p2
         t_mtx = np.transpose(w_capt) @ h_capt @ t_3
         
     else:

@@ -1,7 +1,7 @@
-from setuptools import sic
+# from setuptools import sic
 import surface_geom_SEM as sgs
 import surface_nurbs_isoprm as snip
-import element_stiff_matrix as esm
+import element_stiff_matrix_small as esm
 import numpy as np
 # from surface_geom_SEM import *
 from geomdl import exchange

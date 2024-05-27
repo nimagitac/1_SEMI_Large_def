@@ -2,7 +2,8 @@ import numpy as np
 import lagrange_der as lagder
 from geomdl import exchange
 import surface_geom_SEM as sgs
-import global_stiff_matrix_small as gsm
+import global_stiff_matrix_small as gsmsml
+import hist_displ_mtx_update as hidmtu
 
 
 
@@ -66,11 +67,11 @@ while i_main <= max_order_elem:
         print("\nProgram starts to generate mesh according to continuity at knots and manual input of number of elements ...") 
         u_manual = np.linspace(0, 1, j_main + 1) #np.linspace(a, b, c) divide line ab to c-1 parts or add c points to it.
         v_manual = np.linspace(0, 1, j_main + 1)
-        mesh = gsm.mesh_func(surfs, u_manual, v_manual, c_order_u, c_order_v)
+        mesh = gsmsml.mesh_func(surfs, u_manual, v_manual, c_order_u, c_order_v)
         element_boundaries_u = mesh[0]
         element_boundaries_v = mesh[1]
         
-        bc = gsm.global_boundary_condition(lobatto_pw, bc_h_bott, bc_h_top,\
+        bc = gsmsml.global_boundary_condition(lobatto_pw, bc_h_bott, bc_h_top,\
                                         bc_v_left, bc_v_right, element_boundaries_u,\
                                         element_boundaries_v)
         number_element_u = len(element_boundaries_u) - 1
@@ -85,9 +86,20 @@ while i_main <= max_order_elem:
         node_global_d = node_global_c + number_node_one_row - 1
         total_dof = node_global_d * 5
         displm_complete = np.zeros(total_dof)
-        jacobian_all_node = np.zeros((j_main, j_main, i_main + 1, i_main + 1, 3, 3)) #To avoide multiple calculation of Jacobian matrix, the Value of 
-        hist_node_displ_rot = np.zeros((j_main, j_main, i_main + 1, i_main + 1, 5, 3)) #To record the history of deformation. Dimensions are: number of elment in u and v, number of nodes in xi1 and xi2, (5 for A_1, A_2, A_3, u, omega) each has 3 components.
         
+        
+        nodes_coorsys_displ_all = np.zeros((number_element_v, number_element_u,\
+                                    i_main + 1, i_main + 1, 5, 3)) #To record the history of deformation. Dimensions are: number of elment in u and v, number of nodes in xi1 and xi2, (5 for A_1, A_2, A_3, u, omega) each has 3 components.
+        jacobian_ncoorsys_all = np.zeros((number_element_v, number_element_u,\
+                                    i_main + 1, i_main + 1, 2, 2))
+        coorsys_jac_temp = hidmtu.initiate_ncoorsys_plus_jacmtx(surfs,\
+                                      lobatto_pw, element_boundaries_u,\
+                       element_boundaries_v, nodes_coorsys_displ_all, \
+                                                  jacobian_ncoorsys_all)
+        nodes_coorsys_displ_all = coorsys_jac_temp[0]
+        jacobian_ncoorsys_all = coorsys_jac_temp[1] #To avoide repitition calculation of Jacobian matrix, the Jacobian matrix is calculated for all elements at all GLL points
+        
+        pass
                             
         
         
@@ -95,66 +107,66 @@ while i_main <= max_order_elem:
         
         
         
-        print("\nAssembling global stiffness matrix ...")
-        t_1_assembling = time.perf_counter()
-        k_global = gsm.global_stiffness_matrix(surfs, lobatto_pw, element_boundaries_u, \
-                                            element_boundaries_v, elastic_modulus, nu)
-        t_2_assembling = time.perf_counter()
-        k_global_bc = esm.stiffness_matrix_bc_applied(k_global, bc) 
-        print("\nAssembling global load vector ...")
-        global_load = glv.global_load_vector(surfs, lobatto_pw, element_boundaries_u,\
-                                element_boundaries_v, uniform_load_x,\
-                                uniform_load_y, uniform_load_z)
-        global_load_bc = np.delete(global_load, bc, 0)
-        print("\nLinear solver in action! ...")
-        t_1_solver = time.perf_counter()
-        d = np.linalg.solve(k_global_bc, global_load_bc)
-        t_2_solver = time.perf_counter()
-        n_dimension = k_global.shape[0]
-        displm_compelete = np.zeros(n_dimension)
-        i = 0
-        j = 0
-        while i < n_dimension:
-            if i in bc:
-                i += 1 
-            else:
-                displm_compelete[i] = d[j]
-                i += 1
-                j += 1
-        number_lobatto_node = lobatto_pw.shape[0]
-        number_element_u = len(element_boundaries_u) - 1
-        number_element_v = len(element_boundaries_v) - 1
-        number_node_one_row = number_element_u*(number_lobatto_node - 1) + 1
-        number_node_one_column = number_element_v*(number_lobatto_node - 1) + 1
-        node_global_a = 1 #  u = v = 0 . Four nodes at the tips of the square in u-v parametric space
-        node_global_c = node_global_a + number_element_v*(number_lobatto_node-1)\
-                            *number_node_one_row
-        print('\nDisplacement ratio: {}'.\
-            format(displm_compelete[5*(node_global_c)-3]/u_analytic))
-        # elemnum_displm_array[elemnum_counter] = [i_main,\
-        #     displm_compelete[5*(node_global_c)-3]/u_analytic]
-        # time_assembling [elemnum_counter] = [i_main, t_2_assembling - t_1_assembling]
-        # time_solver [elemnum_counter] = [i_main, t_2_solver - t_1_solver]
-        # n_dimension_bc = global_load_bc.shape[0]
-        # dof_displm_array[elemnum_counter] = [n_dimension_bc, \
-        #                 displm_compelete[5*(node_global_c)-3]/u_analytic]
-        # dof_time_assembling [elemnum_counter] = [n_dimension_bc, t_2_assembling - t_1_assembling] 
-        # dof_time_solver [elemnum_counter] = [n_dimension_bc, t_2_solver - t_1_solver]
-        # if j_main == max_order_elem:###############
-        if i_main in [6, 7, 8]:
-            cond_elem[elemnum_counter] = [j_main, np.linalg.cond(k_global_bc)]
-        elemnum_counter +=1
+    #     print("\nAssembling global stiffness matrix ...")
+    #     t_1_assembling = time.perf_counter()
+    #     k_global = gsmsml.global_stiffness_matrix(surfs, lobatto_pw, element_boundaries_u, \
+    #                                         element_boundaries_v, elastic_modulus, nu)
+    #     t_2_assembling = time.perf_counter()
+    #     k_global_bc = esm.stiffness_matrix_bc_applied(k_global, bc) 
+    #     print("\nAssembling global load vector ...")
+    #     global_load = glv.global_load_vector(surfs, lobatto_pw, element_boundaries_u,\
+    #                             element_boundaries_v, uniform_load_x,\
+    #                             uniform_load_y, uniform_load_z)
+    #     global_load_bc = np.delete(global_load, bc, 0)
+    #     print("\nLinear solver in action! ...")
+    #     t_1_solver = time.perf_counter()
+    #     d = np.linalg.solve(k_global_bc, global_load_bc)
+    #     t_2_solver = time.perf_counter()
+    #     n_dimension = k_global.shape[0]
+    #     displm_compelete = np.zeros(n_dimension)
+    #     i = 0
+    #     j = 0
+    #     while i < n_dimension:
+    #         if i in bc:
+    #             i += 1 
+    #         else:
+    #             displm_compelete[i] = d[j]
+    #             i += 1
+    #             j += 1
+    #     number_lobatto_node = lobatto_pw.shape[0]
+    #     number_element_u = len(element_boundaries_u) - 1
+    #     number_element_v = len(element_boundaries_v) - 1
+    #     number_node_one_row = number_element_u*(number_lobatto_node - 1) + 1
+    #     number_node_one_column = number_element_v*(number_lobatto_node - 1) + 1
+    #     node_global_a = 1 #  u = v = 0 . Four nodes at the tips of the square in u-v parametric space
+    #     node_global_c = node_global_a + number_element_v*(number_lobatto_node-1)\
+    #                         *number_node_one_row
+    #     print('\nDisplacement ratio: {}'.\
+    #         format(displm_compelete[5*(node_global_c)-3]/u_analytic))
+    #     # elemnum_displm_array[elemnum_counter] = [i_main,\
+    #     #     displm_compelete[5*(node_global_c)-3]/u_analytic]
+    #     # time_assembling [elemnum_counter] = [i_main, t_2_assembling - t_1_assembling]
+    #     # time_solver [elemnum_counter] = [i_main, t_2_solver - t_1_solver]
+    #     # n_dimension_bc = global_load_bc.shape[0]
+    #     # dof_displm_array[elemnum_counter] = [n_dimension_bc, \
+    #     #                 displm_compelete[5*(node_global_c)-3]/u_analytic]
+    #     # dof_time_assembling [elemnum_counter] = [n_dimension_bc, t_2_assembling - t_1_assembling] 
+    #     # dof_time_solver [elemnum_counter] = [n_dimension_bc, t_2_solver - t_1_solver]
+    #     # if j_main == max_order_elem:###############
+    #     if i_main in [6, 7, 8]:
+    #         cond_elem[elemnum_counter] = [j_main, np.linalg.cond(k_global_bc)]
+    #     elemnum_counter +=1
         j_main += 1
-    # np.savetxt(f'scordelis_h_ref_displm_p_{j_main}.dat', elemnum_displm_array)
-    # np.savetxt(f'scordelis_h_ref_asmtime_p_{j_main}.dat', time_assembling)
-    # np.savetxt(f'scordelis_h_ref_solvertime_p_{j_main}.dat', time_solver)
-    # np.savetxt(f'scordelis_h_ref_displm_dof_p_{j_main}.dat', dof_displm_array)
-    # np.savetxt(f'scordelis_h_ref_asmtime_dof_p_{j_main}.dat', dof_time_assembling)
-    # np.savetxt(f'scordelis_h_ref_solvertime_dof_p_{j_main}.dat', dof_time_solver)
-    # if j_main == max_order_elem:
-    if i_main in [6, 7, 8]:
-            np.savetxt(f'scordelis_h_ref_cond_elem_p_{i_main}.dat', cond_elem)
+    # # np.savetxt(f'scordelis_h_ref_displm_p_{j_main}.dat', elemnum_displm_array)
+    # # np.savetxt(f'scordelis_h_ref_asmtime_p_{j_main}.dat', time_assembling)
+    # # np.savetxt(f'scordelis_h_ref_solvertime_p_{j_main}.dat', time_solver)
+    # # np.savetxt(f'scordelis_h_ref_displm_dof_p_{j_main}.dat', dof_displm_array)
+    # # np.savetxt(f'scordelis_h_ref_asmtime_dof_p_{j_main}.dat', dof_time_assembling)
+    # # np.savetxt(f'scordelis_h_ref_solvertime_dof_p_{j_main}.dat', dof_time_solver)
+    # # if j_main == max_order_elem:
+    # if i_main in [6, 7, 8]:
+    #         np.savetxt(f'scordelis_h_ref_cond_elem_p_{i_main}.dat', cond_elem)
     i_main += 1
-    # f_global = glv.global_load_vector(surfs, lobatto_pw, element_boundaries_u, element_boundaries_v)
-    # f_global_bc = glv.load_vector_bc_applied(f_global, bc)
-    # d = np.linalg.
+    # # f_global = glv.global_load_vector(surfs, lobatto_pw, element_boundaries_u, element_boundaries_v)
+    # # f_global_bc = glv.load_vector_bc_applied(f_global, bc)
+    # # d = np.linalg.

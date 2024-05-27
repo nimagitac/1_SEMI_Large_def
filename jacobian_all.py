@@ -1,4 +1,4 @@
-import numpy as np
+# import numpy as np
 import surface_nurbs_isoprm as snip
 import lagrange_der as lagd
 
@@ -7,7 +7,8 @@ import lagrange_der as lagd
 def initiate_jacobian_mtx_all(surface, lobatto_pw, element_boundaries_u,\
                        element_boundaries_v,  jacobian_all_node):
     '''
-    This function claculate the Jacobian matrix in all elements at all nodes.
+    This function claculate the Jacobian matrix in all elements at all nodes. jacobian_all_node
+    is imported as its diemensions is the function of number of elements in mesh
     -Output:
     jacobian_all_node(which is (number_element*number_element)*(number_node*number_node)*(3*3))
     
