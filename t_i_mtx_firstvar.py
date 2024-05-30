@@ -7,10 +7,10 @@ def skew(vector):
                      [-vector[1], vector[0], 0]])
     
 
-def r_mtx_i(omega_vector_i):
+def r_mtx_node_i(omega_vector_i):
     '''
     In this function the R_I tensor or large rotation tensor
-    is calculated.
+    is calculated. "I" points to each node.
     See:
     Eq.(18) of
     "A robust non-linear mixed hybrid quadrilateral shell element, 2005
@@ -39,7 +39,7 @@ def t_3_mtx( a_t_1, a_t_2):
     t_3 = np.array([[a_t_1[0], a_t_2[0]], [a_t_1[1], a_t_2[1]], [a_t_1[2], a_t_2[2]]])
     return t_3
 
-def t_mtx_i (omega_vector_i, nodes_coorsys_displ_i, intersection = "false"):
+def t_mtx_i (omega_vector_i, a_0_1, a_0_2, a_0_3, intersection = "false"):
     """
     In this function, T_I in first variation of the director vector of shell at 
     the nodal point "i" is calculated.
@@ -56,23 +56,16 @@ def t_mtx_i (omega_vector_i, nodes_coorsys_displ_i, intersection = "false"):
     unit_mtx = np.identity(3)
     skew_omega = skew(omega_vector_i)
     skew_omega_p2 = skew_omega @ skew_omega
-    if intersection == "false":
-        a_0_1 = nodes_coorsys_displ_i[0]
-        a_0_2 = nodes_coorsys_displ_i[1]
-        a_0_3 = nodes_coorsys_displ_i[2]
-        vdir_0 = a_0_3
-        
+    if intersection == "false":        
         omega_norm = np.linalg.norm(omega_vector_i)
-        r_mtx = r_mtx_i(omega_vector_i)
+        r_mtx = r_mtx_node_i(omega_vector_i)
         
         a_t_1 = r_mtx @ a_0_1
         a_t_2 = r_mtx @ a_0_2
         a_t_3 = r_mtx @ a_0_3
         
         w_capt = skew(a_t_3)
-        print(w_capt)
         t_3 = t_3_mtx( a_t_1, a_t_2)
-        print(t_3)
         if omega_norm == 0:
             tc_1 = 1/2
             tc_2 = 1/6
@@ -102,5 +95,5 @@ if __name__ == "__main__":
     # a = np.array([0.1, 0.2, -0.3])
     # print(r_mtx @ a)
     c_sys = np.array([[1, 3, 5], [-2, 3, 2], [1, 1, 2]])
-    print(r_mtx_i([0.1, 0.2, 0.1]))
+    print(r_mtx_node_i([0.1, 0.2, 0.1]))
     print(t_mtx_i([0.1, 0.2, 0.1], c_sys))

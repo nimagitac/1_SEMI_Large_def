@@ -16,7 +16,7 @@ def beta_to_deltaomega(a_0_1, a_0_2, omega_prv_step_vector, beta_vector):
     delta_omega which is a vector with 3 components
     
     '''
-    r_mtx = tmf.r_mtx_i(omega_prv_step_vector)
+    r_mtx = tmf.r_mtx_node_i(omega_prv_step_vector)
     a_t_1 = r_mtx @ a_0_1
     a_t_2 = r_mtx @ a_0_2
     t_3 = tmf.t_3_mtx(a_t_1, a_t_2)
@@ -24,14 +24,20 @@ def beta_to_deltaomega(a_0_1, a_0_2, omega_prv_step_vector, beta_vector):
     return delta_omega
 
 
-def initiate_ncoorsys_plus_jacmtx(surface, lobatto_pw, element_boundaries_u,\
-                       element_boundaries_v, nodes_coorsys_displ, jacobian_ncoorsys_all):
+
+def initiate_x_0_ncoorsys_jacmtx(surface, lobatto_pw, element_boundaries_u,\
+                       element_boundaries_v, xcapt_coor_all, \
+                       nodes_coorsys_displ, jacobian_ncoorsys_all):
     '''
-    This fucntion calculates the nodal coordinate system
+    -This function calculate the initial coordinate of all the nodes of all the elements
+    -This fucntion calculates the nodal coordinate system
     based on the isoparametric assumption for each element
     and add these three vector: A_1 (a_0_1), A_2 (a_0_2) and A_3 (a_0_3) 
     to the first three members out of 5 members of
     hist_mtx (which is (number_element*number_element)*(number_node*number_node)*(5*3))
+    -This function also calculate the Jacobina matrix from convected coordiate to
+    initial nodal coordinate system according to "A robust non-linear mixed
+    hybrid quadrilateral shell element" Wagenr, Gruttmann, 2005 Eq. (14)
     
     '''
     dim = lobatto_pw.shape[0]
@@ -46,6 +52,7 @@ def initiate_ncoorsys_plus_jacmtx(surface, lobatto_pw, element_boundaries_u,\
             surface_isoprm = snip.SurfaceGeneratedSEM(surface, lobatto_pw, node_1_u,\
                   node_1_v, node_3_u, node_3_v)
             coorsys_tanvec_mtx = surface_isoprm.coorsys_director_tanvec_allnodes()
+            xcapt_coor_all[i, j] = surface_isoprm.nodes_physical_coordinate()
             for r in range(dim):
                 for s in range(dim):
                     a_0_1 = coorsys_tanvec_mtx[r, s, 0]
@@ -56,10 +63,10 @@ def initiate_ncoorsys_plus_jacmtx(surface, lobatto_pw, element_boundaries_u,\
                     nodes_coorsys_displ[i, j, r, s, 0] = a_0_1
                     nodes_coorsys_displ[i, j, r, s, 1] = a_0_2
                     nodes_coorsys_displ[i, j, r, s, 2] = a_0_3
-                    pp= g1 @ a_0_1
-                    pp1= np.dot(g1, a_0_1)
-                    jacobian_ncoorsys_all[i, j, r, s]= np.array([[g1 @ a_0_1, g1 @ a_0_2], [g2 @ a_0_1, g2 @ a_0_2]])
-    return (nodes_coorsys_displ, jacobian_ncoorsys_all)
+                    jacobian_ncoorsys_all[i, j, r, s]=\
+                    np.array([[g1 @ a_0_1, g1 @ a_0_2], [g2 @ a_0_1, g2 @ a_0_2]])
+                   
+    return (xcapt_coor_all, nodes_coorsys_displ, jacobian_ncoorsys_all)
 
 
 
@@ -151,8 +158,8 @@ if __name__ == "__main__":
     print("p_1:", p_1, "  p_2:", p_2, "  p_3:", p_3)
     print("\n\n")
     lobatto_pw_all = lagd.lbto_pw("node_weight_all.dat")
-    number_element_u = 2
-    number_element_v = 2
+    number_element_u = 1
+    number_element_v = 1
     i_main = 2
     if i_main == 1:
         lobatto_pw = lobatto_pw_all[1:3,:]
@@ -288,10 +295,12 @@ nodes_coorsys_displ_all = np.zeros((number_element_v, number_element_u,\
                                     i_main + 1, i_main + 1, 5, 3)) #To record the history of deformation. Dimensions are: number of elment in u and v, number of nodes in xi1 and xi2, (5 for A_1, A_2, A_3, u, omega) each has 3 components.
 jacobian_ncoorsys_all = np.zeros((number_element_v, number_element_u,\
                                     i_main + 1, i_main + 1, 2, 2)) 
+xcapt_coor_all = np.zeros((number_element_v, number_element_u, i_main + 1, i_main + 1, 3))
 element_boundaries_u = [0, 1] 
 element_boundaries_v = [0, 1]
-ncoorsys_jac_local= initiate_ncoorsys_plus_jacmtx(surfs, lobatto_pw, element_boundaries_u,\
-                       element_boundaries_v, nodes_coorsys_displ_all, jacobian_ncoorsys_all)
-nodes_coorsys_displ_all = ncoorsys_jac_local[0]
-jacobian_ncoorsys_all = ncoorsys_jac_local[1]
+ncoorsys_jac_local= initiate_x_0_ncoorsys_jacmtx(surfs, lobatto_pw, element_boundaries_u,\
+                       element_boundaries_v, xcapt_coor_all, nodes_coorsys_displ_all, jacobian_ncoorsys_all)
+xcapt_all = ncoorsys_jac_local[0]
+nodes_coorsys_displ_all = ncoorsys_jac_local[1]
+jacobian_ncoorsys_all = ncoorsys_jac_local[2]
 

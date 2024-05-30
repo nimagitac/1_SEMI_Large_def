@@ -3,7 +3,7 @@ import lagrange_der as lagder
 from geomdl import exchange
 import surface_geom_SEM as sgs
 import global_stiff_matrix_small as gsmsml
-import hist_displ_mtx_update as hidmtu
+import hist_displ_mtx_update as hdu
 
 
 
@@ -92,12 +92,14 @@ while i_main <= max_order_elem:
                                     i_main + 1, i_main + 1, 5, 3)) #To record the history of deformation. Dimensions are: number of elment in u and v, number of nodes in xi1 and xi2, (5 for A_1, A_2, A_3, u, omega) each has 3 components.
         jacobian_ncoorsys_all = np.zeros((number_element_v, number_element_u,\
                                     i_main + 1, i_main + 1, 2, 2))
-        coorsys_jac_temp = hidmtu.initiate_ncoorsys_plus_jacmtx(surfs,\
+        x_0_coor_all = np.zeros((number_element_v, number_element_u, i_main + 1, i_main + 1, 3)) # The initial coordinate of each element node for each element
+        inital_coor_coorsys_jac = hdu.initiate_x_0_ncoorsys_jacmtx(surfs,\
                                       lobatto_pw, element_boundaries_u,\
-                       element_boundaries_v, nodes_coorsys_displ_all, \
-                                                  jacobian_ncoorsys_all)
-        nodes_coorsys_displ_all = coorsys_jac_temp[0]
-        jacobian_ncoorsys_all = coorsys_jac_temp[1] #To avoide repitition calculation of Jacobian matrix, the Jacobian matrix is calculated for all elements at all GLL points
+                                   element_boundaries_v, x_0_coor_all,\
+                                  nodes_coorsys_displ_all, jacobian_ncoorsys_all)
+        x_0_coor_all = inital_coor_coorsys_jac[0]
+        nodes_coorsys_displ_all = inital_coor_coorsys_jac[1]
+        jacobian_ncoorsys_all = inital_coor_coorsys_jac[2] #To avoide repitition calculation of Jacobian matrix, the Jacobian matrix is calculated for all elements at all GLL points
         
         pass
                             
