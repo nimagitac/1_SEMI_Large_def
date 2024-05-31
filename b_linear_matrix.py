@@ -81,7 +81,7 @@ def der_lag2d_dti_node_i(jacobian_at_node, der_lag2d_dxi_node_i):
      to the Jacobian matrix and calculation of the der_lagd2d_dxi.
     The first row is d(lag2d)/dti1 and the second is d(lag2d)/dti2
     -Output:
-    Is a 2 x number_lobatto_points*2 matrix
+    Is a 2 x number_lobatto_points^2 matrix
     '''
     inv_jac = np.linalg.inv(jacobian_at_node)
     der_lag_2d_dti = inv_jac @ der_lag2d_dxi_node_i
@@ -115,22 +115,31 @@ def der_lag2d_dti_node_i(jacobian_at_node, der_lag2d_dxi_node_i):
 #     return (der_x_t_dt1, der_x_t_dt2)
 
 # @profile
-def der_x_t_dt(number_lobatto_point, der_lag2d_dti\
-                    , elem_x_0, elem_displ):
+def der_x_t_dt(number_lobatto_point, der_lag2d_dti,\
+                    elem_x_0, elem_displ):
     '''
     In this function the derivatives of x (position vector at time 't')
     are calculated at the specified integration point. The specific integration
     point is introduced through der_lag2d_dti which is calculated according to the
     input coordinate.
+    dim is the number of the Lobatto points.
+    elem_x_0: A dim*dim*3 matrix which contains the initial coordinates of the nodes
+    elem_displ: A dim*dim*2*3 matrix which contain at [i,j,0] 'u'(displacement vector)
+    and at [i, j, 1] the 'beta' (rotation vector)
     -Output:
     is a 2 x 3 matrix. The first element is dx/dt1 and the second is dx/dt2 at the 
     specific integration points.
     '''
     dim = number_lobatto_point
     
-    elem_x_t = elem_x_0[:dim, :dim] + elem_displ[:dim, :dim] # x = X + u
+    elem_x_t = np.zeros((dim, dim, 3))# x = X + u
     der_x_t_dt1 = np.zeros(3)
-    der_x_t_dt2 = np.zeros(3)   
+    der_x_t_dt2 = np.zeros(3)
+    # for i in range(dim):# x = X + u
+    #     for j in range(dim):
+    #         elem_x_t[i, j] = elem_x_0[i, j] + elem_displ[i, j, 0]
+    elem_x_t = elem_x_0[: , : ] + elem_displ[: , : , 0] # x = X + u
+              
     for i in range(dim):
         for j in range(dim):
             icapt = ij_to_icapt(dim, i, j)
@@ -138,7 +147,7 @@ def der_x_t_dt(number_lobatto_point, der_lag2d_dti\
             der_x_t_dt2 = der_x_t_dt2 + der_lag2d_dti[1, icapt] * elem_x_t[i, j]
     return (der_x_t_dt1, der_x_t_dt2)
             
-def elem_director_nodal_value(number_lobatto_point, elem_coorsys_displ):
+def elem_update_dir_all(number_lobatto_point, elem_nodal_coorsys, elem_displ):
     '''
     In this function, the updated director at time 't' for all of the nodes
     of the element is calculated and stored.
@@ -146,17 +155,17 @@ def elem_director_nodal_value(number_lobatto_point, elem_coorsys_displ):
     A num_lobatto x numlobbato x 3 matrix
     '''
     dim = number_lobatto_point
-    elem_director_at_nodes = np.zeros((dim, dim, 3))
+    elem_updated_dir_all = np.zeros((dim, dim, 3))
     for i in range(dim):
         for j in range(dim):
-            omega_vect = elem_coorsys_displ
-            a_0_3 = elem_coorsys_displ[i, j, 2]
+            omega_vect = elem_displ[i, j, 1]
+            a_0_3 = elem_nodal_coorsys[i, j, 2]
             rot_mtx_i = tmf.r_mtx_node_i(omega_vect)
             a_t_3 = rot_mtx_i @ a_0_3
-            elem_director_at_nodes[i, j] = a_t_3
-    return elem_director_at_nodes
+            elem_updated_dir_all[i, j] = a_t_3
+    return elem_updated_dir_all
 
-def der_director_dt(number_lobatto_point, der_lag2d_dti, elem_dir_nodal_mtx):
+def der_dir_t_dt(number_lobatto_point, der_lag2d_dti, elem_updated_dir_all):
     '''
     In this function the derivatives of director vector
     are calculated at the specified integration point. The specific integration
@@ -172,16 +181,10 @@ def der_director_dt(number_lobatto_point, der_lag2d_dti, elem_dir_nodal_mtx):
     for i in range(dim):
         for j in range(dim):
             icapt = ij_to_icapt(dim, i, j)
-            der_dir_dt1 = der_dir_dt1 + der_lag2d_dti[0, icapt] * elem_dir_nodal_mtx[i, j]
-            der_dir_dt2 = der_dir_dt2 + der_lag2d_dti[1, icapt] * elem_dir_nodal_mtx[i, j]
+            der_dir_dt1 = der_dir_dt1 + der_lag2d_dti[0, icapt] * elem_updated_dir_all[i, j]
+            der_dir_dt2 = der_dir_dt2 + der_lag2d_dti[1, icapt] * elem_updated_dir_all[i, j]
     return (der_dir_dt1, der_dir_dt2)
             
-            
-    
-        
-            
-    
-
 
 
         
@@ -215,8 +218,9 @@ if __name__ =='__main__':
                             index[0, 0] + (i_main+1) +1, :]
     dim = lobatto_pw.shape[0]
     jacobian_at_node = np.array([[1, 2],[3, 4]])
-    elem_displ = np.random.randint(0, 4, size=(dim, dim, 3))
+    elem_displ = np.random.randint(0, 4, size=(dim, dim, 2, 3))
     elem_x_0 = np.random.randint(0, 10, size=(dim, dim, 3))
+    elem_dir_all = np. random.randint(0, 5, size=(dim, dim, 3))
     print('\n', elem_displ, '\n', elem_x_0)
     for i in range( dim):
         xi2 = lobatto_pw[i, 0]
@@ -232,7 +236,8 @@ if __name__ =='__main__':
             der_lag2d_dti = der_lag2d_dti_node_i(jacobian_at_node, der_lag2d_dxi)
             der_x_dt = der_x_t_dt(dim, der_lag2d_dti, elem_x_0, elem_displ)
             der_x_dt_test = der_x_t_dt(dim, der_lag2d_dti, elem_x_0, elem_displ)
+            der_dir = der_dir_t_dt(dim, der_lag2d_dti, elem_dir_all)
             print(der_x_dt,'\n', der_x_dt_test,'\n\n\n')
             
-    subprocess.call("C:\\Nima\\N-Research\\DFG\\Python_programming\\Large_def\\1_SEMI_Large_def\\.P3-12-2\\Scripts\\snakeviz.exe process.profile ", \
-                  shell=False)  
+    # subprocess.call("C:\\Nima\\N-Research\\DFG\\Python_programming\\Large_def\\1_SEMI_Large_def\\.P3-12-2\\Scripts\\snakeviz.exe process.profile ", \
+    #               shell=False)  

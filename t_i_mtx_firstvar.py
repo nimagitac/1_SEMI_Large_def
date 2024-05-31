@@ -1,5 +1,26 @@
 import numpy as np
 import math as math
+import cProfile
+
+
+def profile(func):
+    '''This function is used for profiling the file.
+    It will be used as a decorator.
+    output:
+    A powershell profling and process.profile file'''
+    def inner(*args, **kwargs):
+        pr = cProfile.Profile()
+        pr.enable()
+        value = func(*args, **kwargs)
+        pr.disable()
+        # s = io.StringIO()
+        # sortby = SortKey.CUMULATIVE
+        # ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+        # ps.print_stats()
+        # print(s.getvalue())
+        pr.dump_stats('process.profile')
+        return value
+    return inner
 
 def skew(vector):
     return np.array([[0, -vector[2], vector[1]],
