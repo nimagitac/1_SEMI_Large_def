@@ -89,9 +89,9 @@ while i_main <= max_order_elem:
         
         
         node_displ_all = np.zeros((number_element_v, number_element_u,\
-                                    i_main + 1, i_main + 1, 2, 3)) #To record the history of deformation. Dimensions are: number of elment in u and v, number of nodes in xi1 and xi2, (5 for A_1, A_2, A_3, u, omega) each has 3 components.
+                                    i_main + 1, i_main + 1, 2, 3)) #To record the history of deformation. Dimensions are: number of elment in u and v, number of nodes in xi1 and xi2, 2x3 for u, omega, each has 3 components.
         nodal_coorsys_all = np.zeros((number_element_v, number_element_u,\
-                                    i_main + 1, i_main + 1, 3, 3))
+                                    i_main + 1, i_main + 1, 3, 3)) #TDimensions are: number of elment in u and v, number of nodes in xi1 and xi2, 3x3 for A_1, A_2, A_3
         jacobian_all = np.zeros((number_element_v, number_element_u,\
                                     i_main + 1, i_main + 1, 2, 2))
         x_0_coor_all = np.zeros((number_element_v, number_element_u, i_main + 1, i_main + 1, 3)) # The initial coordinate of each element node for each element

@@ -58,6 +58,8 @@ def ij_to_icapt(number_lobatto_point, row_num, col_num):
     icapt = row_num * number_lobatto_point + col_num
     return icapt
 
+
+
 def der_lag2d_dxi_node_i(number_lobatto_point, lag_xi1, lag_xi2, der_lag_dxi1,\
                   der_lag_dxi2):
     '''
@@ -74,7 +76,7 @@ def der_lag2d_dxi_node_i(number_lobatto_point, lag_xi1, lag_xi2, der_lag_dxi1,\
             der_lag2d_dxi[1, icap] = der_lag_dxi2[i] * lag_xi1[j]
     return der_lag2d_dxi
 
-def der_lag2d_dti_node_i(jacobian_at_node, der_lag2d_dxi_node_i):
+def der_lag2d_dt_node_i(jacobian_at_node, der_lag2d_dxi_node_i):
     '''
      This function calculate the derivatives of 2D lagrange shape functions with
      repsect to the coordinates of local nodal coordinate systemat each node regarding
@@ -116,7 +118,7 @@ def der_lag2d_dti_node_i(jacobian_at_node, der_lag2d_dxi_node_i):
 
 # @profile
 def der_x_t_dt(number_lobatto_point, der_lag2d_dti,\
-                    elem_x_0, elem_displ):
+                    elem_x_0_all, elem_displ_all):
     '''
     In this function the derivatives of x (position vector at time 't')
     are calculated at the specified integration point. The specific integration
@@ -124,7 +126,7 @@ def der_x_t_dt(number_lobatto_point, der_lag2d_dti,\
     input coordinate.
     dim is the number of the Lobatto points.
     elem_x_0: A dim*dim*3 matrix which contains the initial coordinates of the nodes
-    elem_displ: A dim*dim*2*3 matrix which contain at [i,j,0] 'u'(displacement vector)
+    elem_displ_all: A dim*dim*2*3 matrix which contain at [i,j,0] 'u'(displacement vector)
     and at [i, j, 1] the 'beta' (rotation vector)
     -Output:
     is a 2 x 3 matrix. The first element is dx/dt1 and the second is dx/dt2 at the 
@@ -138,7 +140,7 @@ def der_x_t_dt(number_lobatto_point, der_lag2d_dti,\
     # for i in range(dim):# x = X + u
     #     for j in range(dim):
     #         elem_x_t[i, j] = elem_x_0[i, j] + elem_displ[i, j, 0]
-    elem_x_t = elem_x_0[: , : ] + elem_displ[: , : , 0] # x = X + u
+    elem_x_t = elem_x_0_all[: , : ] + elem_displ_all[: , : , 0] # x = X + u
               
     for i in range(dim):
         for j in range(dim):
@@ -147,7 +149,7 @@ def der_x_t_dt(number_lobatto_point, der_lag2d_dti,\
             der_x_t_dt2 = der_x_t_dt2 + der_lag2d_dti[1, icapt] * elem_x_t[i, j]
     return (der_x_t_dt1, der_x_t_dt2)
             
-def elem_update_dir_all(number_lobatto_point, elem_nodal_coorsys, elem_displ):
+def elem_update_dir_all(number_lobatto_point, elem_nodal_coorsys_all, elem_displ_all):
     '''
     In this function, the updated director at time 't' for all of the nodes
     of the element is calculated and stored.
@@ -158,8 +160,8 @@ def elem_update_dir_all(number_lobatto_point, elem_nodal_coorsys, elem_displ):
     elem_updated_dir_all = np.zeros((dim, dim, 3))
     for i in range(dim):
         for j in range(dim):
-            omega_vect = elem_displ[i, j, 1]
-            a_0_3 = elem_nodal_coorsys[i, j, 2]
+            omega_vect = elem_displ_all[i, j, 1]
+            a_0_3 = elem_nodal_coorsys_all[i, j, 2]
             rot_mtx_i = tmf.r_mtx_node_i(omega_vect)
             a_t_3 = rot_mtx_i @ a_0_3
             elem_updated_dir_all[i, j] = a_t_3
@@ -186,11 +188,83 @@ def der_dir_t_dt(number_lobatto_point, der_lag2d_dti, elem_updated_dir_all):
     return (der_dir_dt1, der_dir_dt2)
             
 
+def elem_t_i_mtx_all(number_lobatto_point, elem_nodal_coorsys_all, elem_displ_all):
+    '''
+    In this function, t_i matrix, which connects the variation of nodal local rotation to
+    the variation of director, is calculated and stored at all the integration points of
+    the element. According to Eq. (28) in 
+    "A robust non-linear mixed hybrid quadrilateral shell element", Wagner, Gruttman, 2005
+    -Output:
+    A num_lobatto_point x num_lobatto_point x 3 x 3 matrix. Each element[i, j]
+    is a 3x2 matrix
+    '''
+    dim = number_lobatto_point
+    elem_t_i_mtx_all = np.zeros((dim, dim, 3, 3))
+    for i in range(dim):
+        for j in range(dim):
+            omega_vect = elem_displ_all[i, j, 1]
+            a_0_1 = elem_nodal_coorsys_all[i, j, 0]
+            a_0_2 = elem_nodal_coorsys_all[i, j, 1]
+            a_0_3 = elem_nodal_coorsys_all[i, j, 2]
+            t_i_mtx = tmf.t_mtx_i (omega_vect, a_0_1, a_0_2, a_0_3, intersection = "false")
+            elem_t_i_mtx_all[i, j] = t_i_mtx
+    return elem_t_i_mtx_all
 
+
+
+
+#The xi1 and xi2 are calculated and the for loops for calculting them are inside element_stiffness_function
         
-# def der_dir_t_dt(number_lobatto_point, der_lag2d_dti\
-#                     , elem_x_0, elem_displ)       
+def b_linear_mtx(lobattow_pw, dir_t_intp, der_x_t_dt_intp, der_dir_t_dt_intp, der_lag2d_dt, elem_t_i_mtx_all, lag_xi1, lag_xi2 \
+                 
+                 elem_ncoorsys, elem_displ, der_lag2d_dt, der_x_t_dt, der_dir_t_dt):   
+    '''
     
+    ''' 
+    
+    dim = np.shape(lobattow_pw)[0]
+    b_linear_intp = np.zeros((8, 5*(dim**2)))
+    der_shf_dt1 = der_lag2d_dt[0]
+    der_shf_dt2 = der_lag2d_dt[1]
+    der_x_dt1 = der_x_t_dt_intp[0]
+    der_x_dt2 = der_x_t_dt_intp[1]
+    der_dir_dt1 = der_dir_t_dt_intp[0]
+    der_dir_dt2 = der_dir_t_dt_intp[1]
+    index = 0
+    for i in range(dim):
+        for j in range(dim):
+            icapt = ij_to_icapt(dim, i, j)
+            t_i_mtx = elem_t_i_mtx_all[i, j]
+            b_linear_intp[0, index:index + 3] = der_shf_dt1[icapt] * der_x_dt1
+            b_linear_intp[1, index:index + 3] = der_shf_dt2[icapt] * der_x_dt2
+            b_linear_intp[2, index:index + 3] = der_shf_dt1[icapt] * der_x_dt2 + \
+                                                der_shf_dt2[icapt] * der_x_dt1
+                                                
+            b_linear_intp[3, index:index + 3] = der_shf_dt1[icapt] * der_dir_dt1
+            b_linear_intp[3, index + 3: index + 5] = der_shf_dt1[icapt] *\
+                (der_x_dt1 @ t_i_mtx)
+            
+            b_linear_intp[4, index:index + 3] = der_shf_dt2 * der_dir_dt2
+            b_linear_intp[4, index + 3: index + 5] = der_shf_dt2[icapt] *\
+                (der_x_dt2 @ t_i_mtx)
+            
+            b_linear_intp[5, index:index + 3] = der_shf_dt1[icapt] * der_dir_dt2 +\
+                                                der_shf_dt2[icapt] * der_dir_dt1
+            b_linear_intp[5, index + 3:index + 5] =\
+                                der_shf_dt1[icapt] * (der_x_dt2 @ t_i_mtx) + \
+                                der_shf_dt2[icapt] * (der_x_dt1 @ t_i_mtx) 
+            
+            b_linear_intp[6, index:index + 3] = der_shf_dt1[icapt] * dir_t_intp
+            b_linear_intp[6 , index + 3:index + 5]= \
+                            lag_xi2[i] * lag_xi1[j] * (der_x_dt1 @ t_i_mtx)
+            
+            b_linear_intp[7, index:index + 3] = der_shf_dt2[icapt] * dir_t_intp
+            b_linear_intp[7, index + 3:index + 5] = \
+                            lag_xi2[i] * lag_xi1[j] * (der_x_dt2 @ t_i_mtx)
+            
+            index = index + 5
+    return b_linear_intp
+            
     
  
     
@@ -233,7 +307,7 @@ if __name__ =='__main__':
            
             der_lag2d_dxi = der_lag2d_dxi_node_i( dim, lag_xi1, lag_xi2, der_lag_dxi1,\
                   der_lag_dxi2)
-            der_lag2d_dti = der_lag2d_dti_node_i(jacobian_at_node, der_lag2d_dxi)
+            der_lag2d_dti = der_lag2d_dt_node_i(jacobian_at_node, der_lag2d_dxi)
             der_x_dt = der_x_t_dt(dim, der_lag2d_dti, elem_x_0, elem_displ)
             der_x_dt_test = der_x_t_dt(dim, der_lag2d_dti, elem_x_0, elem_displ)
             der_dir = der_dir_t_dt(dim, der_lag2d_dti, elem_dir_all)

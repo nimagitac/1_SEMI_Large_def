@@ -56,9 +56,14 @@ def t_3_mtx( a_t_1, a_t_2):
      This function make t_3 matrix. This matrix is used to transform 
      beta vector which is the rotation vector in nodal coordinate system
      to omega in global coordinate system.
+     -Output:
+     a 3*2 matrix
     '''
     t_3 = np.array([[a_t_1[0], a_t_2[0]], [a_t_1[1], a_t_2[1]], [a_t_1[2], a_t_2[2]]])
     return t_3
+
+
+
 
 def t_mtx_i (omega_vector_i, a_0_1, a_0_2, a_0_3, intersection = "false"):
     """
@@ -71,7 +76,7 @@ def t_mtx_i (omega_vector_i, a_0_1, a_0_2, a_0_3, intersection = "false"):
     "A robust non-linear mixed hybrid quadrilateral shell element, 2005
     W. Wagner1, and F. Gruttmann"
     -OUTPUT:
-    a 3x3 matrix T_I
+    a 3x2 matrix T_I
 
     """
     unit_mtx = np.identity(3)
