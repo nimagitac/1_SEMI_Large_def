@@ -174,8 +174,8 @@ def der_dir_t_dt(number_lobatto_point, der_lag2d_dti, elem_updated_dir_all):
     point is introduced through der_lag2d_dti which is calculated according to the
     input coordinate.
     -Output:
-    is a 2 x 3 matrix. The first element is da_t_3/dt1 and the second is da_t_3/dt2 at the 
-    specific integration points.
+    is a 2 x 3 matrix. The first element is da_t_3/dt1 and the second is da_t_3/dt2 at a
+    specific integration point.
     '''
     dim = number_lobatto_point
     der_dir_dt1 = np.zeros(3)
@@ -215,11 +215,33 @@ def elem_t_i_mtx_all(number_lobatto_point, elem_nodal_coorsys_all, elem_displ_al
 
 #The xi1 and xi2 are calculated and the for loops for calculting them are inside element_stiffness_function
         
-def b_linear_mtx(lobattow_pw, dir_t_intp, der_x_t_dt_intp, der_dir_t_dt_intp, der_lag2d_dt, elem_t_i_mtx_all, lag_xi1, lag_xi2 \
-                 
-                 elem_ncoorsys, elem_displ, der_lag2d_dt, der_x_t_dt, der_dir_t_dt):   
+def b_linear_mtx(lobattow_pw, lag_xi1, lag_xi2, der_lag2d_dt,\
+                dir_t_intp, der_x_t_dt_intp, der_dir_t_dt_intp,\
+                elem_t_i_mtx_all):   
     '''
+    This function calculates the b_linear at each integration point. The integration point is
+    specified by an external nested loop. each integration point has (i_intp, j_intp)
+   
+    dir_intp: The director at the integration point. It is elem_update_dir_all[i_intp, j_intp]
     
+    der_x_t_dt_intp : The derivatives of current location vector'x' w.r.t (t1, t2) which are
+                      nodal local cartesian coordinatesat the (i_intp, j_intp).
+                      It is calculated by using der_x_t_dt function at each (i_intp, j_intp)
+                      and imported to this function.
+    
+    der_dir_dt_intp : The derivatives of current director vector'x' w.r.t (t1, t2) which are 
+                      nodal local cartesian coordinates at the (i_intp, j_intp).
+                      It is calculated by using der_x_t_dt function at each (i_intp, j_intp)
+                      and imported to this function.
+                      
+    elem_t_i_mtx_all : Is the matrix  with num_node x num_node x 3 x 2 matrix. It contains all
+                       T_I matrices for all the nodes of the element.    
+                      
+    -Output:
+    Is 8 x 5x(p+1)^2 matrix b_linear (something like Eq. (29), in
+    "A robust non-linear mixed hybrid quadrilateral shell element, 2005
+    W. Wagner, and F. Gruttmann") 
+                      
     ''' 
     
     dim = np.shape(lobattow_pw)[0]
@@ -265,8 +287,8 @@ def b_linear_mtx(lobattow_pw, dir_t_intp, der_x_t_dt_intp, der_dir_t_dt_intp, de
             index = index + 5
     return b_linear_intp
             
+
     
- 
     
     
     
