@@ -63,6 +63,10 @@ def ij_to_icapt(number_lobatto_point, row_num, col_num):
 def der_lag2d_dxi_node_i(number_lobatto_point, lag_xi1, lag_xi2, der_lag_dxi1,\
                   der_lag_dxi2):
     '''
+    Basic function. (Will be used repeatedly and therefore should be
+    calculated outside of funtions and get imported avoiding multiple calculation
+    of the same thing)
+    
     This function calculate the derivatives of 2D lagrange shape functions.
     The first row is d(lag2d)/dxi1 and the second is d(lag2d)/dxi2
     -Output:
@@ -78,6 +82,8 @@ def der_lag2d_dxi_node_i(number_lobatto_point, lag_xi1, lag_xi2, der_lag_dxi1,\
 
 def der_lag2d_dt_node_i(jacobian_at_node, der_lag2d_dxi_node_i):
     '''
+    Basic function. 
+    
      This function calculate the derivatives of 2D lagrange shape functions with
      repsect to the coordinates of local nodal coordinate systemat each node regarding
      to the Jacobian matrix and calculation of the der_lagd2d_dxi.
@@ -120,6 +126,8 @@ def der_lag2d_dt_node_i(jacobian_at_node, der_lag2d_dxi_node_i):
 def der_x_t_dt(number_lobatto_point, der_lag2d_dti,\
                     elem_x_0_all, elem_displ_all):
     '''
+    Basic function.
+    
     In this function the derivatives of x (position vector at time 't')
     are calculated at the specified integration point. The specific integration
     point is introduced through der_lag2d_dti which is calculated according to the
@@ -151,6 +159,8 @@ def der_x_t_dt(number_lobatto_point, der_lag2d_dti,\
             
 def elem_update_dir_all(number_lobatto_point, elem_nodal_coorsys_all, elem_displ_all):
     '''
+    Basic function.
+    
     In this function, the updated director at time 't' for all of the nodes
     of the element is calculated and stored.
     -Output:
@@ -169,6 +179,8 @@ def elem_update_dir_all(number_lobatto_point, elem_nodal_coorsys_all, elem_displ
 
 def der_dir_t_dt(number_lobatto_point, der_lag2d_dti, elem_updated_dir_all):
     '''
+    Basic function.
+    
     In this function the derivatives of director vector
     are calculated at the specified integration point. The specific integration
     point is introduced through der_lag2d_dti which is calculated according to the
@@ -183,13 +195,16 @@ def der_dir_t_dt(number_lobatto_point, der_lag2d_dti, elem_updated_dir_all):
     for i in range(dim):
         for j in range(dim):
             icapt = ij_to_icapt(dim, i, j)
-            der_dir_dt1 = der_dir_dt1 + der_lag2d_dti[0, icapt] * elem_updated_dir_all[i, j]
-            der_dir_dt2 = der_dir_dt2 + der_lag2d_dti[1, icapt] * elem_updated_dir_all[i, j]
+            a_t_3 = elem_updated_dir_all[i, j]
+            der_dir_dt1 = der_dir_dt1 + der_lag2d_dti[0, icapt] * a_t_3
+            der_dir_dt2 = der_dir_dt2 + der_lag2d_dti[1, icapt] * a_t_3
     return (der_dir_dt1, der_dir_dt2)
             
 
 def elem_t_i_mtx_all(number_lobatto_point, elem_nodal_coorsys_all, elem_displ_all):
     '''
+    Basic function.
+    
     In this function, t_i matrix, which connects the variation of nodal local rotation to
     the variation of director, is calculated and stored at all the integration points of
     the element. According to Eq. (28) in 
@@ -243,7 +258,6 @@ def b_linear_mtx(lobattow_pw, lag_xi1, lag_xi2, der_lag2d_dt,\
     W. Wagner, and F. Gruttmann") 
                       
     ''' 
-    
     dim = np.shape(lobattow_pw)[0]
     b_linear_intp = np.zeros((8, 5*(dim**2)))
     der_shf_dt1 = der_lag2d_dt[0]
@@ -288,6 +302,120 @@ def b_linear_mtx(lobattow_pw, lag_xi1, lag_xi2, der_lag2d_dt,\
     return b_linear_intp
             
 
+############################### b_geom #####################################
+
+
+def der_dir_0_dt(number_lobatto_point, der_lag2d_dti, elem_nodal_coorsys_all):
+    '''
+    Basic function.
+    
+    In this function the derivatives of director vector in undeformed configuration
+    are calculated (time = 0) at the specified integration point. The specific integration
+    point is introduced through der_lag2d_dti which is calculated according to the
+    input coordinate.
+    -Output:
+    is a 2 x 3 matrix. The first element is da_0_3/dt1 and the second is da_0_3/dt2 at a
+    specific integration point.
+    '''
+    dim = number_lobatto_point
+    der_dir_0_dt1 = np.zeros(3)
+    der_dir_0_dt2 = np.zeros(3)
+    for i in range(dim):
+        for j in range(dim):
+            icapt = ij_to_icapt(dim, i, j)
+            a_0_3 = elem_nodal_coorsys_all[i, j, 2]
+            der_dir_0_dt1 = der_dir_0_dt1 + der_lag2d_dti[0, icapt] * a_0_3
+            der_dir_0_dt2 = der_dir_0_dt2 + der_lag2d_dti[1, icapt] * a_0_3
+    return (der_dir_0_dt1, der_dir_0_dt2)
+
+
+def der_x_0_dt(number_lobatto_point, der_lag2d_dti,\
+                    elem_x_0_all):
+    '''
+    Basic function.
+    
+    In this function the derivatives of X (shown by x_0, position vector 
+    in undeformed configuratio i.e. at time 't = 0') are calculated
+    at the specified integration point. The specific integration point is
+    introduced through der_lag2d_dti which is calculated according to the
+    input coordinate.
+    dim is the number of the Lobatto points.
+    -Output:
+    is a 2 x 3 matrix. The first element is dX/dt1 and the second is dX/dt2 at the 
+    specific integration points.
+    '''
+    dim = number_lobatto_point
+   
+    der_x_0_dt1 = np.zeros(3)
+    der_x_0_dt2 = np.zeros(3)       
+    for i in range(dim):
+        for j in range(dim):
+            icapt = ij_to_icapt(dim, i, j)
+            der_x_0_dt1 = der_x_0_dt1 + der_lag2d_dti[0, icapt] * elem_x_0_all[i, j]
+            der_x_0_dt2 = der_x_0_dt2 + der_lag2d_dti[1, icapt] * elem_x_0_all[i, j]
+    return (der_x_0_dt1, der_x_0_dt2)
+ 
+ 
+def strain_vector (der_x_0_dt, der_x_t_dt, \
+                   dir_0_intp, dir_t_intp, \
+                   der_dir_0_dt, der_dir_t_dt, ):
+    '''
+    der_x_0_dt : is the derivatives of the initial coordinate of a material point
+                 with respect to nodal local coordinate system, t1 and t2,
+                 at an integration point.(in our work nodal local system conincides
+                 with lamina system)
+    der_x_t_dt : is the dervatives of the coordinate of a material point at the 
+                 deformed configuration with respect to the initial nodal local
+                 coordinate system, t1 and t2, at an integration point (in our work, nodal local
+                 system coincides with lamina system)
+    dir_0_intp : is the director at the integration point at time 0, a_0_3
+    dir_t_intp : is the director at the integration point at tim t, a_t_3
+    
+    der_dir_0_dt : the derivatives of the initaldirector vector 
+                    at undeformed configuration with respect to t1 and  t2
+    
+    der_dir_t_dt : the derivatives of the director at deformed configuration
+                    at deformed configuration
+                    
+    -Output:
+    an 8 elements vector to be used to calculate the stresses
+    
+    '''
+    str_vec = np.empty(8)
+    
+    d_x0_dt1 = der_x_0_dt[0]
+    d_x0_dt2 = der_x_0_dt[1]
+    d_xt_dt1 = der_x_t_dt[0]
+    d_xt_dt2 = der_x_t_dt[1]
+    
+    dir_0 = dir_0_intp
+    dir_t = dir_t_intp
+    
+    d_d0_dt1 = der_dir_0_dt[0]
+    d_d0_dt2 = der_dir_0_dt[1]   
+    d_dt_dt1 = der_dir_t_dt[0]
+    d_dt_dt2 = der_dir_t_dt[1]
+    
+    
+    str_vec[0] = 0.5 * (d_xt_dt1 @ d_xt_dt1 - d_x0_dt1 @ d_x0_dt1)
+    str_vec[1] = 0.5 * (d_xt_dt2 @ d_xt_dt2 - d_x0_dt2 @ d_x0_dt2)
+    str_vec[2] = d_xt_dt1 @ d_xt_dt2 - d_x0_dt1 @ d_x0_dt2
+    
+    str_vec[3] = d_xt_dt1 @ d_dt_dt1 - d_x0_dt1 @ d_d0_dt1
+    str_vec[4] = d_xt_dt2 @ d_dt_dt2 - d_x0_dt2 @ d_d0_dt2
+    str_vec[5] = d_xt_dt1 @ d_dt_dt2 + d_xt_dt2 @ d_dt_dt1 - \
+                 (d_x0_dt1 @ d_d0_dt2 + d_x0_dt2 @ d_d0_dt1)
+                 
+    str_vec[6] = d_xt_dt1 @ dir_t - d_x0_dt1 @ dir_0
+    str_vec[7] = d_xt_dt2 @ dir_t - d_x0_dt2 @ dir_t
+    
+    return str_vec
+    
+ 
+ 
+ 
+ 
+ 
     
     
     
