@@ -369,16 +369,16 @@ def strain_vector (der_x_0_dt, der_x_t_dt, \
                  coordinate system, t1 and t2, at an integration point (in our work, nodal local
                  system coincides with lamina system)
     dir_0_intp : is the director at the integration point at time 0, a_0_3
-    dir_t_intp : is the director at the integration point at tim t, a_t_3
+    dir_t_intp : is the director at the integration point at time  t, a_t_3
     
-    der_dir_0_dt : the derivatives of the initaldirector vector 
+    der_dir_0_dt : the derivatives of the inital director vector 
                     at undeformed configuration with respect to t1 and  t2
     
     der_dir_t_dt : the derivatives of the director at deformed configuration
-                    at deformed configuration
+                   with respect to t1 and  t2
                     
     -Output:
-    an 8 elements vector to be used to calculate the stresses
+    an strain vector 8 elements  to be used to calculate the stresses
     
     '''
     str_vec = np.empty(8)
@@ -411,10 +411,61 @@ def strain_vector (der_x_0_dt, der_x_t_dt, \
     
     return str_vec
     
- 
- 
- 
- 
+def stress_vector(strain_vect, elastic_modulus, nu, h):
+    '''
+    In this function, the stress vector calculated. It is:
+    [n11, n22, n12, m11, m22, m12, q1, q2]    
+    '''
+    ks = 5/6
+    elastic_mtx = np.zeros((8, 8))
+    cp = elastic_modulus / (1 - nu**2) * np.array([[1, nu, 0],[nu, 1, 0],[0, 0, (1-nu)/2]])
+    cs = ks * elastic_modulus / (2 * (1 + nu)) * np.array([[1, 0], [0, 1]])
+    elastic_mtx[0:3, 0:3] = h * cp
+    elastic_mtx[3:6, 3:6] = h**3 / 12 * cp
+    elastic_mtx[6:8, 6:8] = h * cs
+    stress_vect = elastic_mtx @ strain_vect
+    return stress_vect
+
+def m_i_mtx (h_vect, dir_t_intp, omega_intp, omega_limit=0.06):
+    '''
+    In this function the M_I matrix used in the calculation of the inner product of
+    an arbitrary vector and the second variation of the director vector, is claculated.
+    It is based on Eq . (34) from 
+    "A robust non-linear mixed hybrid quadrilateral shell element", Wagner, Gruttman, 2005"
+    
+    h_vect : is an arbitrary vector. The formulae in the reference based on the calculation of
+    second order variation (delta variation) of the director pre-dot product by h_vect, it means
+    h_vect_I @ (\Delta\delta)d_I = (\delta)w_I @ M_I(h_vect) @ (\Delta)w_I and
+    (\Delta)w_I = H_I @ (\Delta)\omega_I
+    
+    dir_t_intp : is the director at the integration point at time t, a_t_3
+    
+    omega_intp : the omega vector at point I at time t
+    
+    -Output:
+    Is a 3x3 matrix
+    '''
+    omega_norm = np.linalg.norm(omega_intp)
+    b_i = np.cross(dir_t_intp, h_vect)
+    if omega_norm < omega_limit:
+        c3 = 1/6 * (1 + 1/60 * omega_norm**2)
+        c11 = -1/360 * (1 + 1/21 * omega_norm**2)
+        c_bar10 = 1/6 * (1 + 1/30 * omega_norm**2)
+    else:
+        c3 = (omega_norm * np.sin(omega_norm) + 2 * (np.cos(omega_norm) -1)) / \
+            (omega_norm ** 2 * (np.cos(omega_norm) - 1)) 
+        c11 = (4 * (np.cos(omega_norm)-1) + omega_norm ** 2 + omega_norm * np.sin(omega_norm))/\
+              (2 * omega_norm ** 4 * (np.cos(omega_norm) - 1))
+        c_bar10 = (np.sin(omega_norm) - omega_norm) / (2 * omega_norm * (np.cos(omega_norm) - 1))
+    c10 = c_bar10 * (b_i @ omega_intp) - (dir_t_intp @ h_vect)
+    tt_i = -c3 * b_i + c11 * (b_i @ omega_intp) * omega_intp
+    
+    p1 = 1/2 * (np.outer(dir_t_intp, h_vect) + np.outer(h_vect, dir_t_intp))
+    p2 = 1/2 * (np.outer(tt_i, omega_intp) + np.outer(omega_intp, tt_i))
+    p3 = c10 * np.eye(3)
+    m_i = p1 + p2 + p3
+    
+    return m_i
  
     
     
@@ -441,27 +492,32 @@ if __name__ =='__main__':
         lobatto_pw = lobatto_pw_all[index[0, 0] + 1:\
                             index[0, 0] + (i_main+1) +1, :]
     dim = lobatto_pw.shape[0]
-    jacobian_at_node = np.array([[1, 2],[3, 4]])
-    elem_displ = np.random.randint(0, 4, size=(dim, dim, 2, 3))
-    elem_x_0 = np.random.randint(0, 10, size=(dim, dim, 3))
-    elem_dir_all = np. random.randint(0, 5, size=(dim, dim, 3))
-    print('\n', elem_displ, '\n', elem_x_0)
-    for i in range( dim):
-        xi2 = lobatto_pw[i, 0]
-        lag_xi2 = lagd.lagfunc(lobatto_pw, xi2)
-        der_lag_dxi2 = lagd.der_lagfunc_dxi(lobatto_pw, xi2)
-        for j in range( dim):
-            xi1 = lobatto_pw[j, 0]
-            lag_xi1 = lagd.lagfunc(lobatto_pw, xi1)
-            der_lag_dxi1 = lagd.der_lagfunc_dxi(lobatto_pw, xi1)
+    mm = m_i_mtx (np.array([1, 2, 3]), np.array([0.1, 0.5, 0.86]), np.array([0.05, 0.02, 0.03]), omega_limit=0.1)
+    pass
+    # strain_vec = np.array([1, 1, 1, 2, 2, 2, 3, 3])
+    # strs_vect = stress_vector(strain_vec, 10, 0.1, 5)
+    # print(strs_vect)
+    # jacobian_at_node = np.array([[1, 2],[3, 4]])
+    # elem_displ = np.random.randint(0, 4, size=(dim, dim, 2, 3))
+    # elem_x_0 = np.random.randint(0, 10, size=(dim, dim, 3))
+    # elem_dir_all = np. random.randint(0, 5, size=(dim, dim, 3))
+    # print('\n', elem_displ, '\n', elem_x_0)
+    # for i in range( dim):
+    #     xi2 = lobatto_pw[i, 0]
+    #     lag_xi2 = lagd.lagfunc(lobatto_pw, xi2)
+    #     der_lag_dxi2 = lagd.der_lagfunc_dxi(lobatto_pw, xi2)
+    #     for j in range( dim):
+    #         xi1 = lobatto_pw[j, 0]
+    #         lag_xi1 = lagd.lagfunc(lobatto_pw, xi1)
+    #         der_lag_dxi1 = lagd.der_lagfunc_dxi(lobatto_pw, xi1)
            
-            der_lag2d_dxi = der_lag2d_dxi_node_i( dim, lag_xi1, lag_xi2, der_lag_dxi1,\
-                  der_lag_dxi2)
-            der_lag2d_dti = der_lag2d_dt_node_i(jacobian_at_node, der_lag2d_dxi)
-            der_x_dt = der_x_t_dt(dim, der_lag2d_dti, elem_x_0, elem_displ)
-            der_x_dt_test = der_x_t_dt(dim, der_lag2d_dti, elem_x_0, elem_displ)
-            der_dir = der_dir_t_dt(dim, der_lag2d_dti, elem_dir_all)
-            print(der_x_dt,'\n', der_x_dt_test,'\n\n\n')
+    #         der_lag2d_dxi = der_lag2d_dxi_node_i( dim, lag_xi1, lag_xi2, der_lag_dxi1,\
+    #               der_lag_dxi2)
+    #         der_lag2d_dti = der_lag2d_dt_node_i(jacobian_at_node, der_lag2d_dxi)
+    #         der_x_dt = der_x_t_dt(dim, der_lag2d_dti, elem_x_0, elem_displ)
+    #         der_x_dt_test = der_x_t_dt(dim, der_lag2d_dti, elem_x_0, elem_displ)
+    #         der_dir = der_dir_t_dt(dim, der_lag2d_dti, elem_dir_all)
+    #         print(der_x_dt,'\n', der_x_dt_test,'\n\n\n')
             
     # subprocess.call("C:\\Nima\\N-Research\\DFG\\Python_programming\\Large_def\\1_SEMI_Large_def\\.P3-12-2\\Scripts\\snakeviz.exe process.profile ", \
     #               shell=False)  
