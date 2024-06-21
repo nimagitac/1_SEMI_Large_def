@@ -76,7 +76,7 @@ def t_mtx_i (omega_vector_i, a_0_1, a_0_2, a_0_3, intersection = "false"):
     "A robust non-linear mixed hybrid quadrilateral shell element, 2005
     W. Wagner1, and F. Gruttmann"
     -OUTPUT:
-    a 3x2 matrix T_I
+    Three matrix, the first is h_capt(3x3), second is T_3(3x2) and the third is 3x2 matrix T_I
 
     """
     unit_mtx = np.identity(3)
@@ -105,7 +105,7 @@ def t_mtx_i (omega_vector_i, a_0_1, a_0_2, a_0_3, intersection = "false"):
     else:
         None# To be added
         
-    return t_mtx
+    return (h_capt, t_3, t_mtx)
 
 
 
@@ -122,4 +122,5 @@ if __name__ == "__main__":
     # print(r_mtx @ a)
     c_sys = np.array([[1, 3, 5], [-2, 3, 2], [1, 1, 2]])
     print(r_mtx_node_i([0.1, 0.2, 0.1]))
-    print(t_mtx_i([0.1, 0.2, 0.1], c_sys))
+    print(t_mtx_i([0.1, 0.2, 0.1], c_sys[0], c_sys[1], c_sys[2])[0])
+    print(type(t_mtx_i([0.1, 0.2, 0.1], c_sys[0], c_sys[1], c_sys[2])[2]))
