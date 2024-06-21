@@ -47,6 +47,7 @@ def profile(func):
         pr.dump_stats('process.profile')
         return value
     return inner
+
     
 def ij_to_icapt(number_lobatto_point, row_num, col_num):
     '''
@@ -80,6 +81,7 @@ def der_lag2d_dxi_node_i(number_lobatto_point, lag_xi1, lag_xi2, der_lag_dxi1,\
             der_lag2d_dxi[1, icap] = der_lag_dxi2[i] * lag_xi1[j]
     return der_lag2d_dxi
 
+
 def der_lag2d_dt_node_i(jacobian_at_node, der_lag2d_dxi_node_i):
     '''
     Basic function. 
@@ -96,31 +98,7 @@ def der_lag2d_dt_node_i(jacobian_at_node, der_lag2d_dxi_node_i):
     
     return der_lag_2d_dti
     
-    
-# @profile
-# def der_x_t_dt(number_lobatto_point, der_lag2d_dti\
-#                     , elem_x_0, elem_displ):
-#     '''
-#     In this f
-#     '''
-#     dim = number_lobatto_point
-    
-#     elem_x_t = elem_x_0[:dim, :dim] + elem_displ[:dim, :dim] # x = X + u
 
-#     x_t_1_vect = np.zeros((dim**2))
-#     x_t_2_vect = np.zeros((dim**2))
-#     x_t_3_vect = np.zeros((dim**2))
-#     for i in range(dim):
-#         for j in range(dim):
-#             icapt = ij_to_icapt(dim, i, j)
-#             x_t_1_vect[icapt] = elem_x_t[i, j, 0]
-#             x_t_2_vect[icapt] = elem_x_t[i, j, 1]
-#             x_t_3_vect[icapt] = elem_x_t[i, j, 2]    
-#     der_x_t_dt1 = np.array([der_lag2d_dti[0] @ x_t_1_vect, der_lag2d_dti[0] @ x_t_2_vect,\
-#                             der_lag2d_dti[0] @ x_t_3_vect])
-#     der_x_t_dt2 = np.array([der_lag2d_dti[1] @ x_t_1_vect, der_lag2d_dti[1] @ x_t_2_vect,\
-#                             der_lag2d_dti[1] @ x_t_3_vect])
-#     return (der_x_t_dt1, der_x_t_dt2)
 
 # @profile
 def der_x_t_dt(number_lobatto_point, der_lag2d_dti,\
@@ -201,7 +179,7 @@ def der_dir_t_dt(number_lobatto_point, der_lag2d_dti, elem_updated_dir_all):
     return (der_dir_dt1, der_dir_dt2)
             
 
-def elem_t_i_mtx_all(number_lobatto_point, elem_nodal_coorsys_all, elem_displ_all):
+def elem_hcapt_t3_ti_mtx_all(number_lobatto_point, elem_nodal_coorsys_all, elem_displ_all):
     '''
     Basic function.
     
@@ -210,10 +188,16 @@ def elem_t_i_mtx_all(number_lobatto_point, elem_nodal_coorsys_all, elem_displ_al
     the element. According to Eq. (28) in 
     "A robust non-linear mixed hybrid quadrilateral shell element", Wagner, Gruttman, 2005
     -Output:
-    A num_lobatto_point x num_lobatto_point x 3 x 3 matrix. Each element[i, j]
-    is a 3x2 matrix
+    Three, (dim x dim x 3 x 3),(dim x dim x 3 x 2) and 
+    (dim x dim x 3 x 2 matrix) matrices. The first one is 
+    H matrxi for all nodes, the second is t_3 matrix for all
+    nodes and the last one is t_i matrix for all nodes of an
+    element. The definition of these matrices can be found in 
+    the mentioned refrence in Eqs. (26), (27) and (34)
     '''
     dim = number_lobatto_point
+    elem_h_capt_mtx_all = np.zeros((dim, dim, 3, 3))
+    elem_t_3_mtx_all = np.zeros((dim, dim, 3, 3))
     elem_t_i_mtx_all = np.zeros((dim, dim, 3, 3))
     for i in range(dim):
         for j in range(dim):
@@ -221,16 +205,49 @@ def elem_t_i_mtx_all(number_lobatto_point, elem_nodal_coorsys_all, elem_displ_al
             a_0_1 = elem_nodal_coorsys_all[i, j, 0]
             a_0_2 = elem_nodal_coorsys_all[i, j, 1]
             a_0_3 = elem_nodal_coorsys_all[i, j, 2]
-            t_i_mtx = tmf.t_mtx_i (omega_vect, a_0_1, a_0_2, a_0_3, intersection = "false")
-            elem_t_i_mtx_all[i, j] = t_i_mtx
-    return elem_t_i_mtx_all
+            hcapt_t3_ti = tmf.t_mtx_i (omega_vect, \
+                  a_0_1, a_0_2, a_0_3, intersection = "false")
+            elem_h_capt_mtx_all[i, j] = hcapt_t3_ti[0]
+            elem_t_3_mtx_all[i, j] = hcapt_t3_ti[1]
+            elem_t_i_mtx_all[i, j] = hcapt_t3_ti[2]
+    return (elem_h_capt_mtx_all, elem_t_3_mtx_all, elem_t_i_mtx_all)
 
+
+# def elem_t_3_i_mtx_all(number_lobatto_point, elem_nodal_coorsys_all, elem_displ_all):
+#     '''
+#     Parameters:
+#     number_lobatto_point : the number of nodes in one direction of the element = dim
+#     elem_nodal_coorsys_all : the matrix with dimensions dim x dim x 3 x 3 which is the 
+#                              eqaul to "nodal_coorsys_all[elem_num_i, elem_num_j]"
+#     elem_displ_all : the displacement of all nodes of the element which is equal to
+#                       "node_displ_all[num_elem_i, num_elem_j]"
+#     In this function T_3 matrix (which is 3 x 2, when there is no kink or intersection) for
+#     is calculated and stored each node i,j. T_3 depends on the rotation tensor and initial nodal
+#     coordinate system.
+    
+#     -Output
+#     A dim x dim x 3 x 2 matrix
+#     '''
+#     dim = number_lobatto_point
+#     elem_t_3_mtx = np.zeros((dim, dim, 3, 3))
+#     for i in range(dim):
+#         for j in range(dim):
+            
+#             omega_vect = elem_displ_all[i, j, 1]
+#             a_0_1 = elem_nodal_coorsys_all[i, j, 0]
+#             a_0_2 = elem_nodal_coorsys_all[i, j, 1]
+#             r_mtx = tmf.r_mtx_node_i(omega_vect)  
+#             a_t_1 = r_mtx @ a_0_1
+#             a_t_2 = r_mtx @ a_0_2
+#             elem_t_3_mtx[i, j] = tmf.t_3_mtx( a_t_1, a_t_2)
+#     return elem_t_3_mtx
+            
 
 
 
 #The xi1 and xi2 are calculated and the for loops for calculting them are inside element_stiffness_function
         
-def b_linear_mtx(lobattow_pw, lag_xi1, lag_xi2, der_lag2d_dt,\
+def b_disp_mtx(lobattow_pw, lag_xi1, lag_xi2, der_lag2d_dt,\
                 dir_t_intp, der_x_t_dt_intp, der_dir_t_dt_intp,\
                 elem_t_i_mtx_all):   
     '''
@@ -260,8 +277,8 @@ def b_linear_mtx(lobattow_pw, lag_xi1, lag_xi2, der_lag2d_dt,\
     ''' 
     dim = np.shape(lobattow_pw)[0]
     b_linear_intp = np.zeros((8, 5*(dim**2)))
-    der_shf_dt1 = der_lag2d_dt[0]
-    der_shf_dt2 = der_lag2d_dt[1]
+    der_ncapt_dt1 = der_lag2d_dt[0] #ncapt means N, or the shape function. Referring to Gruttman 2005
+    der_ncapt_dt2 = der_lag2d_dt[1]
     der_x_dt1 = der_x_t_dt_intp[0]
     der_x_dt2 = der_x_t_dt_intp[1]
     der_dir_dt1 = der_dir_t_dt_intp[0]
@@ -270,33 +287,34 @@ def b_linear_mtx(lobattow_pw, lag_xi1, lag_xi2, der_lag2d_dt,\
     for i in range(dim):
         for j in range(dim):
             icapt = ij_to_icapt(dim, i, j)
+            ncapt_icapt = lag_xi2[i] * lag_xi1[j] # ncapt_icapt = N_I in the formulation or the shape function
             t_i_mtx = elem_t_i_mtx_all[i, j]
-            b_linear_intp[0, index:index + 3] = der_shf_dt1[icapt] * der_x_dt1
-            b_linear_intp[1, index:index + 3] = der_shf_dt2[icapt] * der_x_dt2
-            b_linear_intp[2, index:index + 3] = der_shf_dt1[icapt] * der_x_dt2 + \
-                                                der_shf_dt2[icapt] * der_x_dt1
+            b_linear_intp[0, index:index + 3] = der_ncapt_dt1[icapt] * der_x_dt1
+            b_linear_intp[1, index:index + 3] = der_ncapt_dt2[icapt] * der_x_dt2
+            b_linear_intp[2, index:index + 3] = der_ncapt_dt1[icapt] * der_x_dt2 + \
+                                                der_ncapt_dt2[icapt] * der_x_dt1
                                                 
-            b_linear_intp[3, index:index + 3] = der_shf_dt1[icapt] * der_dir_dt1
-            b_linear_intp[3, index + 3: index + 5] = der_shf_dt1[icapt] *\
+            b_linear_intp[3, index:index + 3] = der_ncapt_dt1[icapt] * der_dir_dt1
+            b_linear_intp[3, index + 3: index + 5] = der_ncapt_dt1[icapt] *\
                 (der_x_dt1 @ t_i_mtx)
             
-            b_linear_intp[4, index:index + 3] = der_shf_dt2 * der_dir_dt2
-            b_linear_intp[4, index + 3: index + 5] = der_shf_dt2[icapt] *\
+            b_linear_intp[4, index:index + 3] = der_ncapt_dt2 * der_dir_dt2
+            b_linear_intp[4, index + 3: index + 5] = der_ncapt_dt2[icapt] *\
                 (der_x_dt2 @ t_i_mtx)
             
-            b_linear_intp[5, index:index + 3] = der_shf_dt1[icapt] * der_dir_dt2 +\
-                                                der_shf_dt2[icapt] * der_dir_dt1
+            b_linear_intp[5, index:index + 3] = der_ncapt_dt1[icapt] * der_dir_dt2 +\
+                                                der_ncapt_dt2[icapt] * der_dir_dt1
             b_linear_intp[5, index + 3:index + 5] =\
-                                der_shf_dt1[icapt] * (der_x_dt2 @ t_i_mtx) + \
-                                der_shf_dt2[icapt] * (der_x_dt1 @ t_i_mtx) 
+                                der_ncapt_dt1[icapt] * (der_x_dt2 @ t_i_mtx) + \
+                                der_ncapt_dt2[icapt] * (der_x_dt1 @ t_i_mtx) 
             
-            b_linear_intp[6, index:index + 3] = der_shf_dt1[icapt] * dir_t_intp
+            b_linear_intp[6, index:index + 3] = der_ncapt_dt1[icapt] * dir_t_intp
             b_linear_intp[6 , index + 3:index + 5]= \
-                            lag_xi2[i] * lag_xi1[j] * (der_x_dt1 @ t_i_mtx)
+                            ncapt_icapt * (der_x_dt1 @ t_i_mtx)
             
-            b_linear_intp[7, index:index + 3] = der_shf_dt2[icapt] * dir_t_intp
+            b_linear_intp[7, index:index + 3] = der_ncapt_dt2[icapt] * dir_t_intp
             b_linear_intp[7, index + 3:index + 5] = \
-                            lag_xi2[i] * lag_xi1[j] * (der_x_dt2 @ t_i_mtx)
+                            ncapt_icapt * (der_x_dt2 @ t_i_mtx)
             
             index = index + 5
     return b_linear_intp
@@ -335,7 +353,7 @@ def der_x_0_dt(number_lobatto_point, der_lag2d_dti,\
     Basic function.
     
     In this function the derivatives of X (shown by x_0, position vector 
-    in undeformed configuratio i.e. at time 't = 0') are calculated
+    in undeformed configuration i.e. at time 't = 0') are calculated
     at the specified integration point. The specific integration point is
     introduced through der_lag2d_dti which is calculated according to the
     input coordinate.
@@ -426,7 +444,7 @@ def stress_vector(strain_vect, elastic_modulus, nu, h):
     stress_vect = elastic_mtx @ strain_vect
     return stress_vect
 
-def m_i_mtx (h_vect, dir_t_intp, omega_intp, omega_limit=0.06):
+def m_i_mtx (h_vect, dir_t_intp, omega_intp, omega_limit=0.1):
     '''
     In this function the M_I matrix used in the calculation of the inner product of
     an arbitrary vector and the second variation of the director vector, is claculated.
@@ -466,8 +484,93 @@ def m_i_mtx (h_vect, dir_t_intp, omega_intp, omega_limit=0.06):
     m_i = p1 + p2 + p3
     
     return m_i
- 
+
+
+def kronecker_delta(i, j):
+    """
+    Compute the Kronecker delta δ_ij.
+    """
+    return 1 if i == j else 0
+
+
+# def elem_m_i_mtx_all() unlike elem_t_i_mtx, it seems better that m_i is constructed inside the stiffness_geom_mtx
+
+def stiffness_geom_mtx(number_lobatto_point, lag_xi1, lag_xi2, der_lag2d_dt, \
+                       elem_t_i_mtx_all, elem_t_3_mtx_all, elem_h_capt_mtx_all,\
+                       elem_displ_all, elem_updated_dir_all, der_x_t_dt, stress_vect ):
+    '''
     
+    '''
+    dim = number_lobatto_point
+    k_geom = np.zeros(5 * dim**2, 5 * dim**2)
+    d_n_dt1 = der_lag2d_dt[0] # Shape function N. Referring to Gruttman 2005
+    d_n_dt2 = der_lag2d_dt[1]
+    d_xt_dt1 = der_x_t_dt[0]
+    d_xt_dt2 = der_x_t_dt[1]
+    n11, n22, n12, m11, m22, m12, q1, q2 = stress_vect
+    for i in range(dim):
+        for j in range(dim):
+            h_i = elem_h_capt_mtx_all[i, j]
+            t_3_i = elem_t_3_mtx_all[i, j]
+            t_i = elem_t_i_mtx_all[i, j] # Refering to the calculation of the first variation of the director            
+            icapt = ij_to_icapt(dim, i, j)
+            n_i = lag_xi2[i] * lag_xi1[j] # N_I, Ith shape function in the formulation  
+            d_n_i_dt1 = d_n_dt1[icapt]  
+            d_n_i_dt2 = d_n_dt2[icapt]    
+            h_vect = m11 * d_xt_dt1 * d_n_i_dt1 + \
+                     m22 * d_xt_dt2 * d_n_i_dt2 + \
+                     m12 * (d_xt_dt2 * d_n_i_dt1 + d_xt_dt1 * d_n_i_dt2) + \
+                     q1 * d_xt_dt1 * n_i + q2 * d_xt_dt2 * n_i            
+            omega_vect = elem_displ_all[i, j, 1]  
+            dirc_t = elem_updated_dir_all[i, j]  # Director at time t       
+            m_i = m_i_mtx(h_vect, dirc_t, omega_vect)
+            for r in range(dim):
+                for s in range(dim):
+                    t_k = elem_t_i_mtx_all[r, s]
+                    kcapt = ij_to_icapt(dim, i, j)
+                    n_k = lag_xi2[r] * lag_xi1[s] # N_K is the kth shape finction
+                    d_n_k_dt1 = d_n_dt1[kcapt]
+                    d_n_k_dt2 = d_n_dt2[kcapt]
+                    
+                    k_geom[icapt:(icapt + 3), kcapt:(kcapt + 3)] =\
+                                              (n11 * d_n_i_dt1 * d_n_k_dt1 + \
+                                               n22 * d_n_i_dt2 * d_n_k_dt2 + \
+                     n12 * (d_n_i_dt1 * d_n_k_dt2 + d_n_i_dt2 * d_n_k_dt1)) * np.eye(3)
+                                               
+                    k_geom[(icapt + 3):(icapt + 5), kcapt:(kcapt + 3)] = \
+                                              np.transpose(t_i) * \
+                                             (m11 * d_n_i_dt1 * d_n_k_dt1 + \
+                                              m22 * d_n_i_dt2 * d_n_k_dt2 + \
+                                m12 *(d_n_i_dt1 * d_n_k_dt2 + d_n_i_dt2 * d_n_k_dt1) + \
+                                            q1 * d_n_i_dt1 * n_k + q2 * d_n_i_dt2 * n_k)
+                                           
+                                               
+                    k_geom[icapt:(icapt + 3), (kcapt + 3):(kcapt + 5)] = \
+                                            (m11 * d_n_i_dt1 * d_n_k_dt1 + \
+                                            m22 * d_n_i_dt2 * d_n_k_dt2 + \
+                     m12 *(d_n_i_dt1 * d_n_k_dt2 + d_n_i_dt2 * d_n_k_dt1)) * t_k 
+                    
+                    k_geom [(icapt + 3):(icapt + 5), (kcapt + 3):(kcapt + 5)] = \
+                                            kronecker_delta(icapt, kcapt) * \
+                                            np.transpose(t_3_i) @ np.transpose(h_i) @ \
+                                            m_i @ h_i @ t_3_i
+    return k_geom
+                                                                                            
+                                           
+                                            
+                     
+                    
+                                            
+                                            
+                        
+                                                
+                                             
+                                             
+                                         
+                  
+            
+            
+
     
     
     
