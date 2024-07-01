@@ -95,10 +95,10 @@ while i_main <= max_order_elem:
         jacobian_all = np.zeros((number_element_v, number_element_u,\
                                     i_main + 1, i_main + 1, 2, 2))
         x_0_coor_all = np.zeros((number_element_v, number_element_u, i_main + 1, i_main + 1, 3)) # The initial coordinate of each element node for each element
-        inital_coor_coorsys_jac = hdu.initiate_x_0_ncoorsys_jacmtx(surfs,\
+        inital_coor_coorsys_jac = hdu.initiate_x_0_ncoorsys_jacmtx_all(surfs,\
                                       lobatto_pw, element_boundaries_u,\
                                    element_boundaries_v, x_0_coor_all,\
-                                  node_displ_all, jacobian_all)
+                                  nodal_coorsys_all, jacobian_all)
         x_0_coor_all = inital_coor_coorsys_jac[0]
         nodal_coorsys_all = inital_coor_coorsys_jac[1]
         jacobian_all = inital_coor_coorsys_jac[2] #To avoide repitition calculation of Jacobian matrix, the Jacobian matrix is calculated for all elements at all GLL points

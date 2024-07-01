@@ -25,7 +25,7 @@ def deltabeta_to_deltaomega(a_0_1, a_0_2, omega_prv_step_vector, deltabeta_vecto
 
 
 
-def initiate_x_0_ncoorsys_jacmtx(surface, lobatto_pw, element_boundaries_u,\
+def initiate_x_0_ncoorsys_jacmtx_all(surface, lobatto_pw, element_boundaries_u,\
                        element_boundaries_v, x_0_coor_all, \
                        nodal_coorsys_all, jacobian_ncoorsys_all):
     '''
@@ -244,16 +244,16 @@ if __name__ == "__main__":
     
     print('\n\n updated history:', update_hist_mtx[0, 0, 0, 0])
 ###########################################################################################################
-nodes_coorsys_displ_all = np.zeros((number_element_v, number_element_u,\
-                                    i_main + 1, i_main + 1, 5, 3)) #To record the history of deformation. Dimensions are: number of elment in u and v, number of nodes in xi1 and xi2, (5 for A_1, A_2, A_3, u, omega) each has 3 components.
-jacobian_ncoorsys_all = np.zeros((number_element_v, number_element_u,\
-                                    i_main + 1, i_main + 1, 2, 2)) 
-xcapt_coor_all = np.zeros((number_element_v, number_element_u, i_main + 1, i_main + 1, 3))
-element_boundaries_u = [0, 1] 
-element_boundaries_v = [0, 1]
-ncoorsys_jac_local= initiate_x_0_ncoorsys_jacmtx(surfs, lobatto_pw, element_boundaries_u,\
-                       element_boundaries_v, xcapt_coor_all, nodes_coorsys_displ_all, jacobian_ncoorsys_all)
-xcapt_all = ncoorsys_jac_local[0]
-nodes_coorsys_displ_all = ncoorsys_jac_local[1]
-jacobian_ncoorsys_all = ncoorsys_jac_local[2]
+    nodes_coorsys_displ_all = np.zeros((number_element_v, number_element_u,\
+                                        i_main + 1, i_main + 1, 5, 3)) #To record the history of deformation. Dimensions are: number of elment in u and v, number of nodes in xi1 and xi2, (5 for A_1, A_2, A_3, u, omega) each has 3 components.
+    jacobian_ncoorsys_all = np.zeros((number_element_v, number_element_u,\
+                                        i_main + 1, i_main + 1, 2, 2)) 
+    xcapt_coor_all = np.zeros((number_element_v, number_element_u, i_main + 1, i_main + 1, 3))
+    element_boundaries_u = [0, 1] 
+    element_boundaries_v = [0, 1]
+    ncoorsys_jac_local= initiate_x_0_ncoorsys_jacmtx_all(surfs, lobatto_pw, element_boundaries_u,\
+                        element_boundaries_v, xcapt_coor_all, nodes_coorsys_displ_all, jacobian_ncoorsys_all)
+    xcapt_all = ncoorsys_jac_local[0]
+    nodes_coorsys_displ_all = ncoorsys_jac_local[1]
+    jacobian_ncoorsys_all = ncoorsys_jac_local[2]
 

@@ -3,11 +3,18 @@ import surface_geom_SEM as sgs
 import lagrange_der as lagd
 import t_i_mtx_firstvar as tmf
 import cProfile
+from line_profiler import LineProfiler
+import os
 import subprocess
+import hist_displ_mtx_update as hdu
+import element_stiff_matrix_small as esmsml
+import global_stiff_matrix_small as gsmsml
+import global_load_vector_uniform_small as glvsml
 
 from geomdl import exchange
 
-
+# os.environ['OMP_NUM_THREADS'] = '3'
+# os.environ['MKL_NUM_THREADS'] = '3'
 
 # def jacobian_element_ncoorsys_mtx (lobatto_pw, coorsys_tanvec_mtx):
 #     '''
@@ -82,7 +89,8 @@ def der_lag2d_dxi_node_i(number_lobatto_point, lag_xi1, lag_xi2, der_lag_dxi1,\
     return der_lag2d_dxi
 
 
-def der_lag2d_dt_node_i(jacobian_at_node, der_lag2d_dxi_node_i):
+def der_lag2d_dt_node_i(number_lobatto_point, lag_xi1, lag_xi2, der_lag_dxi1,\
+                  der_lag_dxi2, jacobian_at_node):
     '''
     Basic function. 
     
@@ -93,15 +101,17 @@ def der_lag2d_dt_node_i(jacobian_at_node, der_lag2d_dxi_node_i):
     -Output:
     Is a 2 x number_lobatto_points^2 matrix
     '''
+    der_lag2d_dxi_node = der_lag2d_dxi_node_i(number_lobatto_point, \
+                         lag_xi1, lag_xi2, der_lag_dxi1, der_lag_dxi2)
     inv_jac = np.linalg.inv(jacobian_at_node)
-    der_lag_2d_dti = inv_jac @ der_lag2d_dxi_node_i
+    der_lag_2d_dt = inv_jac @ der_lag2d_dxi_node
     
-    return der_lag_2d_dti
+    return der_lag_2d_dt
     
 
 
 # @profile
-def der_x_t_dt(number_lobatto_point, der_lag2d_dti,\
+def der_x_t_dt(number_lobatto_point, der_lag2d_dt,\
                     elem_x_0_all, elem_displ_all):
     '''
     Basic function.
@@ -131,8 +141,8 @@ def der_x_t_dt(number_lobatto_point, der_lag2d_dti,\
     for i in range(dim):
         for j in range(dim):
             icapt = ij_to_icapt(dim, i, j)
-            der_x_t_dt1 = der_x_t_dt1 + der_lag2d_dti[0, icapt] * elem_x_t[i, j]
-            der_x_t_dt2 = der_x_t_dt2 + der_lag2d_dti[1, icapt] * elem_x_t[i, j]
+            der_x_t_dt1 = der_x_t_dt1 + der_lag2d_dt[0, icapt] * elem_x_t[i, j]
+            der_x_t_dt2 = der_x_t_dt2 + der_lag2d_dt[1, icapt] * elem_x_t[i, j]
     return (der_x_t_dt1, der_x_t_dt2)
             
 def elem_update_dir_all(number_lobatto_point, elem_nodal_coorsys_all, elem_displ_all):
@@ -142,7 +152,7 @@ def elem_update_dir_all(number_lobatto_point, elem_nodal_coorsys_all, elem_displ
     In this function, the updated director at time 't' for all of the nodes
     of the element is calculated and stored.
     -Output:
-    A num_lobatto x numlobbato x 3 matrix
+    A num_lobatto x num_lobbato x 3 matrix
     '''
     dim = number_lobatto_point
     elem_updated_dir_all = np.zeros((dim, dim, 3))
@@ -155,7 +165,7 @@ def elem_update_dir_all(number_lobatto_point, elem_nodal_coorsys_all, elem_displ
             elem_updated_dir_all[i, j] = a_t_3
     return elem_updated_dir_all
 
-def der_dir_t_dt(number_lobatto_point, der_lag2d_dti, elem_updated_dir_all):
+def der_dir_t_dt(number_lobatto_point, der_lag2d_dt, elem_updated_dir_all):
     '''
     Basic function.
     
@@ -174,8 +184,8 @@ def der_dir_t_dt(number_lobatto_point, der_lag2d_dti, elem_updated_dir_all):
         for j in range(dim):
             icapt = ij_to_icapt(dim, i, j)
             a_t_3 = elem_updated_dir_all[i, j]
-            der_dir_dt1 = der_dir_dt1 + der_lag2d_dti[0, icapt] * a_t_3
-            der_dir_dt2 = der_dir_dt2 + der_lag2d_dti[1, icapt] * a_t_3
+            der_dir_dt1 = der_dir_dt1 + der_lag2d_dt[0, icapt] * a_t_3
+            der_dir_dt2 = der_dir_dt2 + der_lag2d_dt[1, icapt] * a_t_3
     return (der_dir_dt1, der_dir_dt2)
             
 
@@ -197,8 +207,8 @@ def elem_hcapt_t3_ti_mtx_all(number_lobatto_point, elem_nodal_coorsys_all, elem_
     '''
     dim = number_lobatto_point
     elem_h_capt_mtx_all = np.zeros((dim, dim, 3, 3))
-    elem_t_3_mtx_all = np.zeros((dim, dim, 3, 3))
-    elem_t_i_mtx_all = np.zeros((dim, dim, 3, 3))
+    elem_t_3_mtx_all = np.zeros((dim, dim, 3, 2))
+    elem_t_i_mtx_all = np.zeros((dim, dim, 3, 2))
     for i in range(dim):
         for j in range(dim):
             omega_vect = elem_displ_all[i, j, 1]
@@ -246,15 +256,15 @@ def elem_hcapt_t3_ti_mtx_all(number_lobatto_point, elem_nodal_coorsys_all, elem_
 
 
 #The xi1 and xi2 are calculated and the for loops for calculting them are inside element_stiffness_function
-        
-def b_disp_mtx(lobattow_pw, lag_xi1, lag_xi2, der_lag2d_dt,\
-                dir_t_intp, der_x_t_dt_intp, der_dir_t_dt_intp,\
+# @profile       
+def b_disp_mtx(lobatto_pw, lag_xi1, lag_xi2, der_lag2d_dt,\
+                director_t_intp, der_x_t_dt_intp, der_dir_t_dt_intp,\
                 elem_t_i_mtx_all):   
     '''
     This function calculates the b_linear at each integration point. The integration point is
     specified by an external nested loop. each integration point has (i_intp, j_intp)
    
-    dir_intp: The director at the integration point. It is elem_update_dir_all[i_intp, j_intp]
+    director_t_intp: The director at the integration point. It is elem_update_dir_all[i_intp, j_intp]
     
     der_x_t_dt_intp : The derivatives of current location vector'x' w.r.t (t1, t2) which are
                       nodal local cartesian coordinatesat the (i_intp, j_intp).
@@ -275,10 +285,10 @@ def b_disp_mtx(lobattow_pw, lag_xi1, lag_xi2, der_lag2d_dt,\
     W. Wagner, and F. Gruttmann") 
                       
     ''' 
-    dim = np.shape(lobattow_pw)[0]
+    dim = np.shape(lobatto_pw)[0]
     b_linear_intp = np.zeros((8, 5*(dim**2)))
-    der_ncapt_dt1 = der_lag2d_dt[0] #ncapt means N, or the shape function. Referring to Gruttman 2005
-    der_ncapt_dt2 = der_lag2d_dt[1]
+    der_n_dt1 = der_lag2d_dt[0] #ncapt means N, or the shape function. Referring to Gruttman 2005
+    der_n_dt2 = der_lag2d_dt[1]
     der_x_dt1 = der_x_t_dt_intp[0]
     der_x_dt2 = der_x_t_dt_intp[1]
     der_dir_dt1 = der_dir_t_dt_intp[0]
@@ -289,30 +299,30 @@ def b_disp_mtx(lobattow_pw, lag_xi1, lag_xi2, der_lag2d_dt,\
             icapt = ij_to_icapt(dim, i, j)
             ncapt_icapt = lag_xi2[i] * lag_xi1[j] # ncapt_icapt = N_I in the formulation or the shape function
             t_i_mtx = elem_t_i_mtx_all[i, j]
-            b_linear_intp[0, index:index + 3] = der_ncapt_dt1[icapt] * der_x_dt1
-            b_linear_intp[1, index:index + 3] = der_ncapt_dt2[icapt] * der_x_dt2
-            b_linear_intp[2, index:index + 3] = der_ncapt_dt1[icapt] * der_x_dt2 + \
-                                                der_ncapt_dt2[icapt] * der_x_dt1
+            b_linear_intp[0, index:index + 3] = der_n_dt1[icapt] * der_x_dt1
+            b_linear_intp[1, index:index + 3] = der_n_dt2[icapt] * der_x_dt2
+            b_linear_intp[2, index:index + 3] = der_n_dt1[icapt] * der_x_dt2 + \
+                                                der_n_dt2[icapt] * der_x_dt1
                                                 
-            b_linear_intp[3, index:index + 3] = der_ncapt_dt1[icapt] * der_dir_dt1
-            b_linear_intp[3, index + 3: index + 5] = der_ncapt_dt1[icapt] *\
+            b_linear_intp[3, index:index + 3] = der_n_dt1[icapt] * der_dir_dt1
+            b_linear_intp[3, index + 3:index + 5] = der_n_dt1[icapt] *\
                 (der_x_dt1 @ t_i_mtx)
             
-            b_linear_intp[4, index:index + 3] = der_ncapt_dt2 * der_dir_dt2
-            b_linear_intp[4, index + 3: index + 5] = der_ncapt_dt2[icapt] *\
+            b_linear_intp[4, index:index + 3] = der_n_dt2[icapt] * der_dir_dt2
+            b_linear_intp[4, index + 3:index + 5] = der_n_dt2[icapt] *\
                 (der_x_dt2 @ t_i_mtx)
             
-            b_linear_intp[5, index:index + 3] = der_ncapt_dt1[icapt] * der_dir_dt2 +\
-                                                der_ncapt_dt2[icapt] * der_dir_dt1
+            b_linear_intp[5, index:index + 3] = der_n_dt1[icapt] * der_dir_dt2 +\
+                                                der_n_dt2[icapt] * der_dir_dt1
             b_linear_intp[5, index + 3:index + 5] =\
-                                der_ncapt_dt1[icapt] * (der_x_dt2 @ t_i_mtx) + \
-                                der_ncapt_dt2[icapt] * (der_x_dt1 @ t_i_mtx) 
+                                der_n_dt1[icapt] * (der_x_dt2 @ t_i_mtx) + \
+                                der_n_dt2[icapt] * (der_x_dt1 @ t_i_mtx) 
             
-            b_linear_intp[6, index:index + 3] = der_ncapt_dt1[icapt] * dir_t_intp
+            b_linear_intp[6, index:index + 3] = der_n_dt1[icapt] * director_t_intp
             b_linear_intp[6 , index + 3:index + 5]= \
                             ncapt_icapt * (der_x_dt1 @ t_i_mtx)
             
-            b_linear_intp[7, index:index + 3] = der_ncapt_dt2[icapt] * dir_t_intp
+            b_linear_intp[7, index:index + 3] = der_n_dt2[icapt] * director_t_intp
             b_linear_intp[7, index + 3:index + 5] = \
                             ncapt_icapt * (der_x_dt2 @ t_i_mtx)
             
@@ -320,7 +330,7 @@ def b_disp_mtx(lobattow_pw, lag_xi1, lag_xi2, der_lag2d_dt,\
     return b_linear_intp
             
 
-############################### b_geom #####################################
+############################### k_geom #####################################
 
 
 def der_dir_0_dt(number_lobatto_point, der_lag2d_dti, elem_nodal_coorsys_all):
@@ -347,8 +357,7 @@ def der_dir_0_dt(number_lobatto_point, der_lag2d_dti, elem_nodal_coorsys_all):
     return (der_dir_0_dt1, der_dir_0_dt2)
 
 
-def der_x_0_dt(number_lobatto_point, der_lag2d_dti,\
-                    elem_x_0_all):
+def der_x_0_dt(number_lobatto_point, der_lag2d_dti, elem_x_0_all):
     '''
     Basic function.
     
@@ -376,7 +385,7 @@ def der_x_0_dt(number_lobatto_point, der_lag2d_dti,\
  
 def strain_vector (der_x_0_dt, der_x_t_dt, \
                    dir_0_intp, dir_t_intp, \
-                   der_dir_0_dt, der_dir_t_dt, ):
+                   der_dir_0_dt, der_dir_t_dt):
     '''
     der_x_0_dt : is the derivatives of the initial coordinate of a material point
                  with respect to nodal local coordinate system, t1 and t2,
@@ -429,18 +438,29 @@ def strain_vector (der_x_0_dt, der_x_t_dt, \
     
     return str_vec
     
-def stress_vector(strain_vect, elastic_modulus, nu, h):
+
+def elastic_matrix(elastic_modulus, nu, thk):
+    '''
+    In this function elastic matrix for shell is generated.
+    -Output:
+    A 8x8 matrix
+    '''
+    ks = 5/6 # Timoschenko shear correction factor
+    elastic_mtx = np.zeros((8, 8))
+    cp = elastic_modulus / (1 - nu**2) * np.array([[1, nu, 0],[nu, 1, 0],[0, 0, (1-nu)/2]])
+    cs = ks * elastic_modulus / (2 * (1 + nu)) * np.array([[1, 0], [0, 1]])
+    elastic_mtx[0:3, 0:3] = thk * cp
+    elastic_mtx[3:6, 3:6] = thk**3 / 12 * cp
+    elastic_mtx[6:8, 6:8] = thk * cs
+    return elastic_mtx
+    
+
+
+def stress_vector(strain_vect, elastic_mtx):
     '''
     In this function, the stress vector calculated. It is:
     [n11, n22, n12, m11, m22, m12, q1, q2]    
     '''
-    ks = 5/6
-    elastic_mtx = np.zeros((8, 8))
-    cp = elastic_modulus / (1 - nu**2) * np.array([[1, nu, 0],[nu, 1, 0],[0, 0, (1-nu)/2]])
-    cs = ks * elastic_modulus / (2 * (1 + nu)) * np.array([[1, 0], [0, 1]])
-    elastic_mtx[0:3, 0:3] = h * cp
-    elastic_mtx[3:6, 3:6] = h**3 / 12 * cp
-    elastic_mtx[6:8, 6:8] = h * cs
     stress_vect = elastic_mtx @ strain_vect
     return stress_vect
 
@@ -453,8 +473,8 @@ def m_i_mtx (h_vect, dir_t_intp, omega_intp, omega_limit=0.1):
     
     h_vect : is an arbitrary vector. The formulae in the reference based on the calculation of
     second order variation (delta variation) of the director pre-dot product by h_vect, it means
-    h_vect_I @ (\Delta\delta)d_I = (\delta)w_I @ M_I(h_vect) @ (\Delta)w_I and
-    (\Delta)w_I = H_I @ (\Delta)\omega_I
+    h_vect_I @ (\\Delta\\delta)d_I = (\\delta)w_I @ M_I(h_vect) @ (\\Delta)w_I and
+    (\\Delta)w_I = H_I @ (\\Delta)\\omega_I
     
     dir_t_intp : is the director at the integration point at time t, a_t_3
     
@@ -494,15 +514,36 @@ def kronecker_delta(i, j):
 
 
 # def elem_m_i_mtx_all() unlike elem_t_i_mtx, it seems better that m_i is constructed inside the stiffness_geom_mtx
-
-def stiffness_geom_mtx(number_lobatto_point, lag_xi1, lag_xi2, der_lag2d_dt, \
-                       elem_t_i_mtx_all, elem_t_3_mtx_all, elem_h_capt_mtx_all,\
-                       elem_displ_all, elem_updated_dir_all, der_x_t_dt, stress_vect ):
+# @profile
+def geom_stiffness_mtx(number_lobatto_point, lag_xi1, lag_xi2, der_lag2d_dt, \
+                         elem_h_capt_mtx_all, elem_t_3_mtx_all, elem_t_i_mtx_all,\
+                       elem_displ_all, elem_updated_dir_all, der_x_t_dt, stress_vect):
     '''
+    Some input parameters:
+    der_lag2d_dt : Is the 2x(number_lobatto_point^2) matrix that contains
+                   the total number of the shape functions
+
+    elem_h_capt_mtx_all : Is the matrix that contains all H_I matrices for all 
+                        nodes of the element. In fact for each node T_I = W^Tr @ H_I @ T_3I
+                        Calculated from elem_hcapt_t3_ti_mtx_all function
+    elem_t_3_mtx_all: Is the matrix that contains the T_3I mtx in all the nodes
+                       of the element. Calculated from elem_hcapt_t3_ti_mtx_all function
+    elem_t_i_mtx_all : Is the matrix that contains the T_I matrix for all 
+                      element nodes. T_I matrix in δd_I=T_I δβ_I, β is the rotation
+                      vector in nodal coordinate system. Calculated from elem_hcapt_t3_ti_mtx_all function
+    
+    This function is calculated at each integration point. The coordinates of the integration point
+    is implicitly is taken into account considering lag_xi1, lag_xi2, der_lag2d_dt, der_x_dt etc. In fact
+    der_lag2d_dt, der_x_dt etc. are calculated at each integration point in the main loop of creating the 
+    stiffness matrix of an element.
+    
+    -Output: 
+    Geometrical stiffness claculated at the specified integration point.
     
     '''
     dim = number_lobatto_point
-    k_geom = np.zeros(5 * dim**2, 5 * dim**2)
+    k_geom = np.zeros((5 * dim**2, 5 * dim**2))
+    eye3 = np.eye(3)
     d_n_dt1 = der_lag2d_dt[0] # Shape function N. Referring to Gruttman 2005
     d_n_dt2 = der_lag2d_dt[1]
     d_xt_dt1 = der_x_t_dt[0]
@@ -510,7 +551,7 @@ def stiffness_geom_mtx(number_lobatto_point, lag_xi1, lag_xi2, der_lag2d_dt, \
     n11, n22, n12, m11, m22, m12, q1, q2 = stress_vect
     for i in range(dim):
         for j in range(dim):
-            h_i = elem_h_capt_mtx_all[i, j]
+            hcapt_i = elem_h_capt_mtx_all[i, j]
             t_3_i = elem_t_3_mtx_all[i, j]
             t_i = elem_t_i_mtx_all[i, j] # Refering to the calculation of the first variation of the director            
             icapt = ij_to_icapt(dim, i, j)
@@ -535,7 +576,7 @@ def stiffness_geom_mtx(number_lobatto_point, lag_xi1, lag_xi2, der_lag2d_dt, \
                     k_geom[icapt:(icapt + 3), kcapt:(kcapt + 3)] =\
                                               (n11 * d_n_i_dt1 * d_n_k_dt1 + \
                                                n22 * d_n_i_dt2 * d_n_k_dt2 + \
-                     n12 * (d_n_i_dt1 * d_n_k_dt2 + d_n_i_dt2 * d_n_k_dt1)) * np.eye(3)
+                     n12 * (d_n_i_dt1 * d_n_k_dt2 + d_n_i_dt2 * d_n_k_dt1)) * eye3
                                                
                     k_geom[(icapt + 3):(icapt + 5), kcapt:(kcapt + 3)] = \
                                               np.transpose(t_i) * \
@@ -552,19 +593,103 @@ def stiffness_geom_mtx(number_lobatto_point, lag_xi1, lag_xi2, der_lag2d_dt, \
                     
                     k_geom [(icapt + 3):(icapt + 5), (kcapt + 3):(kcapt + 5)] = \
                                             kronecker_delta(icapt, kcapt) * \
-                                            np.transpose(t_3_i) @ np.transpose(h_i) @ \
-                                            m_i @ h_i @ t_3_i
+                                            np.transpose(t_3_i) @ np.transpose(hcapt_i) @ \
+                                            m_i @ hcapt_i @ t_3_i
     return k_geom
                                                                                             
                                            
-                                            
-                     
-                    
-                                            
-                                            
-                        
-                                                
+##############################################################################################################
+                                         
+
+@profile
+def element_stiffness_mtx(lobatto_pw, elem_x_0_coor_all, \
+                          elem_nodal_coorsys_all, elem_jacobian_all,\
+                          elem_displ_all, elastic_modulus, nu, thk ):
+    '''
+    
+    
+    ''' 
+    dim = lobatto_pw.shape[0]
+    stiff_mtx = np.zeros((5 * dim**2, 5 * dim**2)) # 5 DOF at each node               
+    elastic_mtx = elastic_matrix(elastic_modulus, nu, thk)
+    elem_updated_dir_all = elem_update_dir_all(dim, elem_nodal_coorsys_all, elem_displ_all) 
+    elem_ht3ti_mtx = elem_hcapt_t3_ti_mtx_all(dim, elem_nodal_coorsys_all, elem_displ_all)
+    elem_hcatp_mtx_all = elem_ht3ti_mtx[0]
+    elem_t_3_mtx_all = elem_ht3ti_mtx[1]
+    elem_t_i_mtx_all = elem_ht3ti_mtx[2]
+    
+    # with open ('qsh_isoprm.dat', 'w') as qsh_file:
+    #     pass
+    
+
+    for i in range(dim):
+        xi2 = lobatto_pw[i, 0]
+        w2 = lobatto_pw[i, 1]
+        #with open ('qsh_isoprm.dat', 'w') as qsh_file:
+        #     pass
+        lag_xi2 = lagd.lagfunc(lobatto_pw, xi2)
+        der_lag_dxi2 = lagd.der_lagfunc_dxi(lobatto_pw, xi2)
+        for j in range(dim):
+            xi1 = lobatto_pw[j, 0]
+            w1 = lobatto_pw[j, 1]
+            # with open ('qsh_isoprm.dat', 'a') as qsh_file:
+            #         np.savetxt(qsh_file, qsh)
+            lag_xi1 = lagd.lagfunc(lobatto_pw, xi1)
+            der_lag_dxi1 = lagd.der_lagfunc_dxi(lobatto_pw, xi1)           
+            jac = elem_jacobian_all[i, j]
+            der_lag2d_dt = der_lag2d_dt_node_i(dim, lag_xi1, lag_xi2, \
+                           der_lag_dxi1, der_lag_dxi2, jac)  
+            dirct_t = elem_updated_dir_all[i, j]
+            der_xt_dt = der_x_t_dt(dim, der_lag2d_dt, elem_x_0_coor_all, \
+                                   elem_displ_all)                                       
+            der_dirt_dt = der_dir_t_dt(dim, der_lag2d_dt, elem_updated_dir_all)                                
+            
+            b_displ = b_disp_mtx(lobatto_pw, lag_xi1, lag_xi2, der_lag2d_dt,\
+                dirct_t, der_xt_dt, der_dirt_dt, elem_t_i_mtx_all) 
+            
+            btr_d_b = np.transpose(b_displ) @ elastic_mtx @ b_displ
+            # stiff_mtx = stiff_mtx + np.linalg.det(jac) * \
+                            # (btr_d_b) * w1 * w2
+                                 
+            der_dir0_dt = der_dir_0_dt(dim, der_lag2d_dt, elem_nodal_coorsys_all)
+            
+            der_x0_dt = der_x_0_dt(dim, der_lag2d_dt, elem_x_0_coor_all) 
                                              
+            strain_vect = strain_vector (der_x0_dt, der_xt_dt, \
+                   elem_nodal_coorsys_all[i, j, 2], elem_updated_dir_all[i, j], \
+                   der_dir0_dt, der_dirt_dt)
+            stress_vect = stress_vector(strain_vect, elastic_mtx) 
+            k_geom = geom_stiffness_mtx(dim, lag_xi1, lag_xi2, der_lag2d_dt, \
+                         elem_hcatp_mtx_all, elem_t_3_mtx_all, elem_t_i_mtx_all,\
+                       elem_displ_all, elem_updated_dir_all, der_xt_dt, stress_vect)
+              
+            
+            stiff_mtx = stiff_mtx + np.linalg.det(jac) * \
+                            (btr_d_b + k_geom ) * w1 * w2
+    return stiff_mtx
+                            
+####################################### TEST functions ##########################################
+def generate_unit_vector():
+    """
+    Generate a random vector with unit length.
+    """
+    vec = np.random.normal(size=3)
+    return vec / np.linalg.norm(vec)
+
+def generate_matrix(n):
+    """
+    Generate a n x n x 3 x 3 matrix where each element is a random vector with unit length.
+    Parameters:
+    n (int): Size of the matrix.
+    Returns:
+    np.ndarray: n x n x 3 x 3 matrix of random unit vectors.
+    """
+    matrix = np.zeros((n, n, 3, 3))
+    for i in range(n):
+        for j in range(n):
+            for k in range(3):
+                matrix[i, j, k] = generate_unit_vector()
+    return matrix                              
                                              
                                          
                   
@@ -576,27 +701,188 @@ def stiffness_geom_mtx(number_lobatto_point, lag_xi1, lag_xi2, der_lag2d_dt, \
     
     
 if __name__ =='__main__':
-    data = exchange.import_json("scordelis_corrected.json") #  pinched_shell_kninsertion_changedeg.json pinched_shell.json rectangle_cantilever square square_kninsertion generic_shell_kninsertion foursided_curved_kninsertion foursided_curved_kninsertion2  rectangle_kninsertion
-    # sgs.visualization(data)
+    u_analytic = 0.3020247
+    elastic_modulus = 4.32*10**8
+    nu = 0
+    thk = 0.25
+    uniform_load_x = 0
+    uniform_load_y = 0
+    uniform_load_z = 90
+    bc_h_bott = [0, 1, 0, 1, 0] #Scordelis shell. zero means clamped DOF
+    bc_h_top = [1, 0, 1, 0, 1]
+    bc_v_left = [1, 1, 1, 1, 1]
+    bc_v_right = [0, 1, 1, 1, 0]
+    print("\nImporting Lobatto points and weights from data-base ...")
+    # time.sleep(1)
+    lobatto_pw_all = lagd.lbto_pw("node_weight_all.dat")
+    print("\nImporting geometry from json file ...")
+    # time.sleep(1)
+    data = exchange.import_json("scordelis_corrected.json") # Hemispherical-shell_pantheon_hole.json pinched_shell_kninsertion_changedeg.json pinched_shell.json rectangle_cantilever square square_kninsertion generic_shell_kninsertion foursided_curved_kninsertion foursided_curved_kninsertion2  rectangle_kninsertion
+    # visualization(data)
     surfs = sgs.SurfaceGeo(data, 0, 0.25)
     p_1 = surfs.physical_crd(0., 0.)
     p_2 = surfs.physical_crd(1., 0.)
     p_3 = surfs.physical_crd(1., 1.)
     print("p_1:", p_1, "  p_2:", p_2, "  p_3:", p_3)
-    print("\n\n")
-    lobatto_pw_all = lagd.lbto_pw("node_weight_all.dat")
-    number_element_u = 2
-    number_element_v = 2
-    i_main = 2
-    if i_main == 1:
-        lobatto_pw = lobatto_pw_all[1:3,:]
-    else:  
-        index = np.argwhere(lobatto_pw_all==i_main)
-        lobatto_pw = lobatto_pw_all[index[0, 0] + 1:\
-                            index[0, 0] + (i_main+1) +1, :]
-    dim = lobatto_pw.shape[0]
-    mm = m_i_mtx (np.array([1, 2, 3]), np.array([0.1, 0.5, 0.86]), np.array([0.05, 0.02, 0.03]), omega_limit=0.1)
+
+    min_order_elem = int(input("\nEnter the minimum order of elements (minimum order = 1):\n"))
+    max_order_elem = min_order_elem # int(input("Enter the maximum order of elements (maximum order = 30):\n"))
+    min_number_elem = 1 # int(input("\nEnter the minimum number of elements in u and v direction:\n"))
+    max_number_elem = 1 # int(input("Enter the maximum number of elements in u and v direction:\n"))
+    print("\nEnter the order of continuity at knots to be used for auto detection of elements boundaries in u direction")
+    print("The default value is '1'")
+    c_order_u = 1 # int(input())
+    print("\nEnter the order of continuity at knots to be used for auto detection of elements boundaries in v direction")
+    print("The default value is '1'")
+    c_order_v = 1 # int(input())
+
+    i_main = min_order_elem
+    while i_main <= max_order_elem:
+        if i_main==1:
+            lobatto_pw = lobatto_pw_all[1:3,:]
+        else:
+            index = np.argwhere(lobatto_pw_all==i_main)
+            lobatto_pw = lobatto_pw_all[index[0, 0] + 1:\
+                                index[0, 0] + (i_main+1) + 1, :]
+        j_main = min_number_elem
+        # elemnum_displm_array = np.zeros((max_number_elem - min_number_elem + 1, 2))
+        # time_assembling = np.zeros((max_number_elem - min_number_elem + 1, 2))
+        # time_solver = np.zeros((max_number_elem - min_number_elem + 1, 2))
+        # dof_displm_array = np.zeros((max_number_elem - min_number_elem + 1, 2)) 
+        # dof_time_assembling = np.zeros((max_number_elem - min_number_elem + 1, 2)) 
+        # dof_time_solver = np.zeros((max_number_elem - min_number_elem + 1, 2)) 
+        # cond_elem =np.zeros((max_number_elem - min_number_elem + 1, 2)) 
+        elemnum_counter = 0
+        while j_main <= max_number_elem:
+            print("\n\n\nNumber of elements manually given in u and v: {}    Order of elements: {} ".\
+                format(str(j_main)+'x'+str(j_main), i_main))
+            print("\nProgram starts to generate mesh according to continuity at knots and manual input of number of elements ...") 
+            u_manual = np.linspace(0, 1, j_main + 1) #np.linspace(a, b, c) divide line ab to c-1 parts or add c points to it.
+            v_manual = np.linspace(0, 1, j_main + 1)
+            mesh = gsmsml.mesh_func(surfs, u_manual, v_manual, c_order_u, c_order_v)
+            element_boundaries_u = mesh[0]
+            element_boundaries_v = mesh[1]
+            
+            bc = gsmsml.global_boundary_condition(lobatto_pw, bc_h_bott, bc_h_top,\
+                                            bc_v_left, bc_v_right, element_boundaries_u,\
+                                            element_boundaries_v)
+            number_element_u = len(element_boundaries_u) - 1
+            number_element_v = len(element_boundaries_v) - 1
+            number_lobatto_node = lobatto_pw.shape[0]
+            number_node_one_row = number_element_u*(number_lobatto_node - 1) + 1
+            number_node_one_column = number_element_v*(number_lobatto_node - 1) + 1
+            node_global_a = 1 #  u = v = 0 . Four nodes at the tips of the square in u-v parametric space
+            node_global_b = number_node_one_row
+            node_global_c = node_global_a + number_element_v*(number_lobatto_node-1)\
+                                *number_node_one_row
+            node_global_d = node_global_c + number_node_one_row - 1
+            total_dof = node_global_d * 5
+            displm_complete = np.zeros(total_dof)
+            
+            
+            node_displ_all = np.zeros((number_element_v, number_element_u,\
+                                        i_main + 1, i_main + 1, 2, 3)) #To record the history of deformation. Dimensions are: number of elment in u and v, number of nodes in xi1 and xi2, 2x3 for u, omega, each has 3 components.
+            nodal_coorsys_all = np.zeros((number_element_v, number_element_u,\
+                                        i_main + 1, i_main + 1, 3, 3)) #TDimensions are: number of elment in u and v, number of nodes in xi1 and xi2, 3x3 for A_1, A_2, A_3
+            jacobian_all = np.zeros((number_element_v, number_element_u,\
+                                        i_main + 1, i_main + 1, 2, 2))
+            x_0_coor_all = np.zeros((number_element_v, number_element_u, i_main + 1, i_main + 1, 3)) # The initial coordinate of each element node for each element
+            inital_coor_coorsys_jac = hdu.initiate_x_0_ncoorsys_jacmtx_all(surfs,\
+                                        lobatto_pw, element_boundaries_u,\
+                                    element_boundaries_v, x_0_coor_all,\
+                                    nodal_coorsys_all, jacobian_all)
+            x_0_coor_all = inital_coor_coorsys_jac[0]
+            nodal_coorsys_all = inital_coor_coorsys_jac[1]
+            jacobian_all = inital_coor_coorsys_jac[2] #To avoide repitition calculation of Jacobian matrix, the Jacobian matrix is calculated for all elements at all GLL points
+            elem_x_0_coor_all = x_0_coor_all[0, 0]
+            elem_nodal_coorsys_all = nodal_coorsys_all[0, 0]
+            elem_jacobian_all = jacobian_all[0, 0]
+            elem_displ_all = node_displ_all[0, 0]
+            
+            k_elem = element_stiffness_mtx(lobatto_pw, elem_x_0_coor_all, \
+                          elem_nodal_coorsys_all, elem_jacobian_all,\
+                          elem_displ_all, elastic_modulus, nu, thk)
+            
+            
+            
+            k_global = k_elem
+            bc = gsmsml.global_boundary_condition(lobatto_pw, bc_h_bott, bc_h_top,\
+                                    bc_v_left, bc_v_right, element_boundaries_u,\
+                                    element_boundaries_v)
+            k_global_bc = esmsml.stiffness_matrix_bc_applied(k_elem, bc) 
+            global_load = glvsml.global_load_vector(surfs, lobatto_pw, element_boundaries_u,\
+                                element_boundaries_v, uniform_load_x,\
+                                uniform_load_y, uniform_load_z)
+            global_load_bc = np.delete(global_load, bc, 0)
+            d = np.linalg.solve(k_global_bc, global_load_bc)
+            n_dimension = k_global.shape[0]
+            displm_compelete = np.zeros(n_dimension)
+            i = 0
+            j = 0
+            while i < n_dimension:
+                if i in bc:
+                    i += 1 
+                else:
+                    displm_compelete[i] = d[j]
+                    i += 1
+                    j += 1
+            number_lobatto_node = lobatto_pw.shape[0]
+            number_node_one_row = number_element_u*(number_lobatto_node - 1) + 1
+            number_node_one_column = number_element_v*(number_lobatto_node - 1) + 1
+            node_global_a = 1 #  u = v = 0 . Four nodes at the tips of the square in u-v parametric space
+            node_global_c = node_global_a + number_element_v*(number_lobatto_node-1)\
+                                *number_node_one_row #  u = 0, v = 1
+            print('\nDisplacement ratio: {}'\
+                .format(displm_compelete[5*(node_global_c)-3]/u_analytic))
+                
+             
+            j_main += 1
+            
+        i_main += 1
+    subprocess.call("C:\\Nima\\N-Research\\DFG\\Python_programming\\Large_def\\1_SEMI_Large_def\\.P3-12-2\\Scripts\\snakeviz.exe process.profile ", \
+                  shell=False)
+        
     pass
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+    # data = exchange.import_json("scordelis_corrected.json") #  pinched_shell_kninsertion_changedeg.json pinched_shell.json rectangle_cantilever square square_kninsertion generic_shell_kninsertion foursided_curved_kninsertion foursided_curved_kninsertion2  rectangle_kninsertion
+    # # sgs.visualization(data)
+    # surfs = sgs.SurfaceGeo(data, 0, 0.25)
+    # p_1 = surfs.physical_crd(0., 0.)
+    # p_2 = surfs.physical_crd(1., 0.)
+    # p_3 = surfs.physical_crd(1., 1.)
+    # print("p_1:", p_1, "  p_2:", p_2, "  p_3:", p_3)
+    # print("\n\n")
+    # lobatto_pw_all = lagd.lbto_pw("node_weight_all.dat")
+    # number_element_u = 2
+    # number_element_v = 2
+    # i_main = 2
+    # if i_main == 1:
+    #     lobatto_pw = lobatto_pw_all[1:3,:]
+    # else:  
+    #     index = np.argwhere(lobatto_pw_all==i_main)
+    #     lobatto_pw = lobatto_pw_all[index[0, 0] + 1:\
+    #                         index[0, 0] + (i_main+1) +1, :]
+    # dim = lobatto_pw.shape[0]
+    # mm = m_i_mtx (np.array([1, 2, 3]), np.array([0.1, 0.5, 0.86]), np.array([0.05, 0.02, 0.03]), omega_limit=0.1)
+    # pass
     # strain_vec = np.array([1, 1, 1, 2, 2, 2, 3, 3])
     # strs_vect = stress_vector(strain_vec, 10, 0.1, 5)
     # print(strs_vect)

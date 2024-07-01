@@ -1,7 +1,7 @@
 # from setuptools import sic
 import surface_geom_SEM as sgs
 import surface_nurbs_isoprm as snip
-import element_stiff_matrix_small as esm
+import element_stiff_matrix_small as esmsml
 import numpy as np
 # from surface_geom_SEM import *
 from geomdl import exchange
@@ -155,7 +155,7 @@ def global_stiffness_matrix(surface, lobatto_pw, element_boundaries_u, \
                   node_1_v, node_3_u, node_3_v)
             coorsys_tanvec_mtx = surface_isoprm.coorsys_director_tanvec_allnodes()
             
-            k_element = esm.element_stiffness_matrix(surface_isoprm, lobatto_pw,\
+            k_element = esmsml.element_stiffness_matrix(surface_isoprm, lobatto_pw,\
                                                 coorsys_tanvec_mtx,\
                                                 elastic_modulus, nu, \
                                                 number_gauss_point=2)
@@ -238,7 +238,7 @@ if __name__ == '__main__':
     data = exchange.import_json("pinched_shell.json") #  pinched_shell_kninsertion_changedeg.json pinched_shell.json rectangle_cantilever square square_kninsertion generic_shell_kninsertion foursided_curved_kninsertion foursided_curved_kninsertion2  rectangle_kninsertion
     # visualization(data)
     surfs = sgs.SurfaceGeo(data, 0, 3)
-    lobatto_pw_all =esm.lbto_pw("node_weight_all.dat")
+    lobatto_pw_all =esmsml.lbto_pw("node_weight_all.dat")
     i_main = 4
     if i_main == 1:
         lobatto_pw = lobatto_pw_all[1:3,:]
@@ -265,7 +265,7 @@ if __name__ == '__main__':
 
     k_global = global_stiffness_matrix(surfs, lobatto_pw, element_boundaries_u, \
                                           element_boundaries_v, elastic_modulus, nu)
-    k_global_bc = esm.stiffness_matrix_bc_applied(k_global, bc1) 
+    k_global_bc = esmsml.stiffness_matrix_bc_applied(k_global, bc1) 
     load = np.zeros(np.shape(k_global)[0])
     p =0.25
     load[0] = p #for pinched                    
