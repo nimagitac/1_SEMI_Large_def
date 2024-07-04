@@ -3,15 +3,15 @@ import surface_geom_SEM as sgs
 import lagrange_der as lagd
 import t_i_mtx_firstvar as tmf
 import cProfile
-from line_profiler import LineProfiler
+import line_profiler as lprf
 import os
 import subprocess
 import hist_displ_mtx_update as hdu
 import element_stiff_matrix_small as esmsml
 import global_stiff_matrix_small as gsmsml
 import global_load_vector_uniform_small as glvsml
-
 from geomdl import exchange
+import time as time
 
 # os.environ['OMP_NUM_THREADS'] = '3'
 # os.environ['MKL_NUM_THREADS'] = '3'
@@ -506,21 +506,27 @@ def m_i_mtx (h_vect, dir_t_intp, omega_intp, omega_limit=0.1):
     return m_i
 
 
-def kronecker_delta(i, j):
-    """
-    Compute the Kronecker delta δ_ij.
-    """
-    return 1 if i == j else 0
-
+# def kronecker_delta(i, j):
+#     """
+#     Compute the Kronecker delta δ_ij.
+#     """
+#     return 1 if i == j else 0
+def accumulate_updates(k_geom, updates):
+    for (icapt, kcapt, lc1_4, lc2_5, lc3_5) in updates:
+        k_geom[icapt:(icapt + 3), kcapt:(kcapt + 3)] = lc1_4
+        k_geom[(icapt + 3):(icapt + 5), kcapt:(kcapt + 3)] = lc2_5
+        k_geom[icapt:(icapt + 3), (kcapt + 3):(kcapt + 5)] = lc3_5
+    return k_geom
 
 # def elem_m_i_mtx_all() unlike elem_t_i_mtx, it seems better that m_i is constructed inside the stiffness_geom_mtx
+# @lprf.profile
 # @profile
 def geom_stiffness_mtx(number_lobatto_point, lag_xi1, lag_xi2, der_lag2d_dt, \
                          elem_h_capt_mtx_all, elem_t_3_mtx_all, elem_t_i_mtx_all,\
                        elem_displ_all, elem_updated_dir_all, der_x_t_dt, stress_vect):
     '''
     Some input parameters:
-    der_lag2d_dt : Is the 2x(number_lobatto_point^2) matrix that contains
+    der_lag2d_dt : is the 2x(number_lobatto_point^2) matrix that contains
                    the total number of the shape functions
 
     elem_h_capt_mtx_all : Is the matrix that contains all H_I matrices for all 
@@ -549,12 +555,16 @@ def geom_stiffness_mtx(number_lobatto_point, lag_xi1, lag_xi2, der_lag2d_dt, \
     d_xt_dt1 = der_x_t_dt[0]
     d_xt_dt2 = der_x_t_dt[1]
     n11, n22, n12, m11, m22, m12, q1, q2 = stress_vect
+    updates = []
     for i in range(dim):
         for j in range(dim):
-            hcapt_i = elem_h_capt_mtx_all[i, j]
-            t_3_i = elem_t_3_mtx_all[i, j]
-            t_i = elem_t_i_mtx_all[i, j] # Refering to the calculation of the first variation of the director            
             icapt = ij_to_icapt(dim, i, j)
+            hcapt_i = elem_h_capt_mtx_all[i, j] # np.eye(3)
+            transp_hcapt_i = np.transpose(hcapt_i)
+            t_3_i = elem_t_3_mtx_all[i, j]
+            transp_t_3_i = np.transpose(t_3_i)
+            t_i = elem_t_i_mtx_all[i, j] # Refering to the calculation of the first variation of the director
+            transp_t_i = np.transpose(t_i)            
             n_i = lag_xi2[i] * lag_xi1[j] # N_I, Ith shape function in the formulation  
             d_n_i_dt1 = d_n_dt1[icapt]  
             d_n_i_dt2 = d_n_dt2[icapt]    
@@ -564,49 +574,99 @@ def geom_stiffness_mtx(number_lobatto_point, lag_xi1, lag_xi2, der_lag2d_dt, \
                      q1 * d_xt_dt1 * n_i + q2 * d_xt_dt2 * n_i            
             omega_vect = elem_displ_all[i, j, 1]  
             dirc_t = elem_updated_dir_all[i, j]  # Director at time t       
-            m_i = m_i_mtx(h_vect, dirc_t, omega_vect)
+            m_i = m_i_mtx(h_vect, dirc_t, omega_vect) # 
             for r in range(dim):
                 for s in range(dim):
-                    t_k = elem_t_i_mtx_all[r, s]
                     kcapt = ij_to_icapt(dim, i, j)
+                    # kronecker_delta = 1 if kcapt == icapt else 0
+                    t_k = elem_t_i_mtx_all[r, s] #np.array([[1, 3], [3, 4], [9, 5]])
                     n_k = lag_xi2[r] * lag_xi1[s] # N_K is the kth shape finction
                     d_n_k_dt1 = d_n_dt1[kcapt]
                     d_n_k_dt2 = d_n_dt2[kcapt]
                     
-                    k_geom[icapt:(icapt + 3), kcapt:(kcapt + 3)] =\
-                                              (n11 * d_n_i_dt1 * d_n_k_dt1 + \
-                                               n22 * d_n_i_dt2 * d_n_k_dt2 + \
-                     n12 * (d_n_i_dt1 * d_n_k_dt2 + d_n_i_dt2 * d_n_k_dt1)) * eye3
-                                               
-                    k_geom[(icapt + 3):(icapt + 5), kcapt:(kcapt + 3)] = \
-                                              np.transpose(t_i) * \
-                                             (m11 * d_n_i_dt1 * d_n_k_dt1 + \
-                                              m22 * d_n_i_dt2 * d_n_k_dt2 + \
-                                m12 *(d_n_i_dt1 * d_n_k_dt2 + d_n_i_dt2 * d_n_k_dt1) + \
-                                            q1 * d_n_i_dt1 * n_k + q2 * d_n_i_dt2 * n_k)
-                                           
-                                               
-                    k_geom[icapt:(icapt + 3), (kcapt + 3):(kcapt + 5)] = \
-                                            (m11 * d_n_i_dt1 * d_n_k_dt1 + \
-                                            m22 * d_n_i_dt2 * d_n_k_dt2 + \
-                     m12 *(d_n_i_dt1 * d_n_k_dt2 + d_n_i_dt2 * d_n_k_dt1)) * t_k 
+                    # t1_1 = time.time()
+                    lc1_1 = n11 * d_n_i_dt1 * d_n_k_dt1 
+                    lc1_2 = n22 * d_n_i_dt2 * d_n_k_dt2
+                    lc1_3 = n12 * (d_n_i_dt1 * d_n_k_dt2 + d_n_i_dt2 * d_n_k_dt1)
+                    lc1_4 = (lc1_1 + lc1_2 +lc1_3) * eye3
+                    # k_geom[icapt:(icapt + 3), kcapt:(kcapt + 3)] = lc1_4
+                    # t1_2 = time.time()
                     
-                    k_geom [(icapt + 3):(icapt + 5), (kcapt + 3):(kcapt + 5)] = \
-                                            kronecker_delta(icapt, kcapt) * \
-                                            np.transpose(t_3_i) @ np.transpose(hcapt_i) @ \
-                                            m_i @ hcapt_i @ t_3_i
-    return k_geom
+                    # t2_1 = time.time()                   
+                    lc2_1 = m11 * d_n_i_dt1 * d_n_k_dt1
+                    lc2_2 = m22 * d_n_i_dt2 * d_n_k_dt2
+                    lc2_3 = m12 *(d_n_i_dt1 * d_n_k_dt2 + d_n_i_dt2 * d_n_k_dt1)
+                    lc2_4 = q1 * n_i * d_n_k_dt1 + q2 * n_i * d_n_k_dt2
+                    lc2_5 = transp_t_i * (lc2_1 + lc2_2 + lc2_3 + lc2_4)
+                    # k_geom[(icapt + 3):(icapt + 5), kcapt:(kcapt + 3)] = lc2_5
+                    # t2_2 = time.time()                      
+                    
+                    # k_geom[(icapt + 3):(icapt + 5), kcapt:(kcapt + 3)] = \
+                    #                            transp_t_i * \
+                    #                          (m11 * d_n_i_dt1 * d_n_k_dt1 + \
+                    #                           m22 * d_n_i_dt2 * d_n_k_dt2 + \
+                    #             m12 *(d_n_i_dt1 * d_n_k_dt2 + d_n_i_dt2 * d_n_k_dt1) + \
+                    #                         q1 * n_i * d_n_k_dt1 + q2 * n_i * d_n_k_dt2)
+                                               
+                    # t3_1 = time.time()                       
+                    lc3_1 = lc2_1 # m11 * d_n_i_dt1 * d_n_k_dt1
+                    lc3_2 = lc2_2 # m22 * d_n_i_dt2 * d_n_k_dt2
+                    lc3_3 = lc2_3 # m12 *(d_n_i_dt1 * d_n_k_dt2 + d_n_i_dt2 * d_n_k_dt1)
+                    lc3_4 = q1 * d_n_i_dt1 * n_k + q2 * d_n_i_dt2 * n_k
+                    lc3_5 = (lc3_1 + lc3_2 + lc3_3 + lc3_4) * t_k
+                    # k_geom[icapt:(icapt + 3), (kcapt + 3):(kcapt + 5)] = lc3_5 
+                    # t3_2 = time.time() 
+                                              
+                    # k_geom[icapt:(icapt + 3), (kcapt + 3):(kcapt + 5)] = \
+                    #                         (m11 * d_n_i_dt1 * d_n_k_dt1 + \
+                    #                         m22 * d_n_i_dt2 * d_n_k_dt2 + \
+                    #             m12 *(d_n_i_dt1 * d_n_k_dt2 + d_n_i_dt2 * d_n_k_dt1) + \
+                    #                      q1 * d_n_i_dt1 * n_k + q2 * d_n_i_dt2 * n_k) * t_k 
+                 
+                 
+                 
+                    k_geom[icapt:(icapt + 3), kcapt:(kcapt + 3)] = lc1_4
+                    k_geom[(icapt + 3):(icapt + 5), kcapt:(kcapt + 3)] = lc2_5
+                    k_geom[icapt:(icapt + 3), (kcapt + 3):(kcapt + 5)] = lc3_5
+                    # updates.append((icapt, kcapt, lc1_4, lc2_5, lc3_5))
+                    
+                    
+                    
+                    # t4_1 = time.time()
+                    if icapt == kcapt:
+                        lc4_1 = transp_t_3_i @ transp_hcapt_i
+                        lc4_2 = hcapt_i @ t_3_i
+                        lc4_3 = lc4_1 @ m_i @ lc4_2
+                        k_geom [(icapt + 3):(icapt + 5), (kcapt + 3):(kcapt + 5)] = lc4_3
+                    # t4_2 = time.time()
+                    
+                    # k_geom [(icapt + 3):(icapt + 5), (kcapt + 3):(kcapt + 5)] = \
+                    #                         kronecker_delta *  transp_t_3_i @ transp_hcapt_i @ m_i @ hcapt_i @ t_3_i
+    # k_geom = accumulate_updates(k_geom, updates)
+
+    return  k_geom
                                                                                             
                                            
 ##############################################################################################################
                                          
-
+# @lprf.profile
 @profile
 def element_stiffness_mtx(lobatto_pw, elem_x_0_coor_all, \
                           elem_nodal_coorsys_all, elem_jacobian_all,\
                           elem_displ_all, elastic_modulus, nu, thk ):
     '''
+    Some input parameters:
+    elem_x_0_coor_all(dim, dim, 3): The coordinates of all Lobatto points of the element at t = 0
+    elem_nodal_coorsys_all (dim, dim, 3, 3): It contains coordinate system (a_0_1, a_0_2, d=a_0_3) at all
+                            Lobatto points
+    elem_jacobian_all (dim, dim, 2, 2) : It contains all  2 x 2 Jacobian matrix at each Lobatto point 
+    elem_displ_all(dim, dim, 2, 3) : It contains [[u1, u2, u3], [β1, β2]] of the element at all nodes
     
+    In this function, the stiffness matrix of the element is built by adding material stiffness matrix
+    b_tr_b and geometrical stiffness matrix, k_geom.
+    
+    -Output: 
+    Is the element stiffness matrix
     
     ''' 
     dim = lobatto_pw.shape[0]
@@ -623,6 +683,7 @@ def element_stiffness_mtx(lobatto_pw, elem_x_0_coor_all, \
     
 
     for i in range(dim):
+        print(i, "\n")
         xi2 = lobatto_pw[i, 0]
         w2 = lobatto_pw[i, 1]
         #with open ('qsh_isoprm.dat', 'w') as qsh_file:
@@ -665,7 +726,7 @@ def element_stiffness_mtx(lobatto_pw, elem_x_0_coor_all, \
               
             
             stiff_mtx = stiff_mtx + np.linalg.det(jac) * \
-                            (btr_d_b + k_geom ) * w1 * w2
+                            (btr_d_b + k_geom) * w1 * w2
     return stiff_mtx
                             
 ####################################### TEST functions ##########################################
