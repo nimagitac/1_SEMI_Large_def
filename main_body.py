@@ -4,12 +4,21 @@ from geomdl import exchange
 import surface_geom_SEM as sgs
 import global_stiff_matrix_small as gsmsml
 import hist_displ_mtx_update as hdu
+import element_stiff_matrix_small as esmsml
+import global_load_vector_uniform_small as glvsml
+import element_stiffness_matrix_largedef as esmlrg
+import cProfile
+import line_profiler as lprf
+import os
+import subprocess
+import time as time
 
 
 
 #INPUT *************************************************************
 u_analytic = 0.3020247
 elastic_modulus = 4.32*10**8
+thk = 0.25
 nu = 0
 uniform_load_x = 0
 uniform_load_y = 0
@@ -33,16 +42,21 @@ data = exchange.import_json("scordelis_corrected.json") #  pinched_shell_kninser
     # visualization(data)
 surfs = sgs.SurfaceGeo(data, 0, 0.25)
 
+p_1 = surfs.physical_crd(0., 0.)
+p_2 = surfs.physical_crd(1., 0.)
+p_3 = surfs.physical_crd(1., 1.)
+print("p_1:", p_1, "  p_2:", p_2, "  p_3:", p_3)
+
 min_order_elem = int(input("\nEnter the minimum order of elements (minimum order = 1):\n"))
-max_order_elem = int(input("Enter the maximum order of elements (maximum order = 30):\n"))
-min_number_elem = int(input("\nEnter the minimum number of elements in u and v direction:\n"))
-max_number_elem = int(input("Enter the maximum number of elements in u and v direction:\n"))
+max_order_elem = min_order_elem # int(input("Enter the maximum order of elements (maximum order = 30):\n"))
+min_number_elem = 1 # int(input("\nEnter the minimum number of elements in u and v direction:\n"))
+max_number_elem = 1 # int(input("Enter the maximum number of elements in u and v direction:\n"))
 print("\nEnter the order of continuity at knots to be used for auto detection of elements boundaries in u direction")
 print("The default value is '1'")
-c_order_u =int(input())
+c_order_u = 1 # int(input())
 print("\nEnter the order of continuity at knots to be used for auto detection of elements boundaries in v direction")
 print("The default value is '1'")
-c_order_v =int(input())
+c_order_v = 1 # int(input())
 
 i_main = min_order_elem
 while i_main <= max_order_elem:
@@ -63,7 +77,7 @@ while i_main <= max_order_elem:
     elemnum_counter = 0
     while j_main <= max_number_elem:
         print("\n\n\nNumber of elements manually given in u and v: {}    Order of elements: {} ".\
-            format(str(j_main)+'x'+str(j_main), i_main))
+        format(str(j_main)+'x'+str(j_main), i_main))
         print("\nProgram starts to generate mesh according to continuity at knots and manual input of number of elements ...") 
         u_manual = np.linspace(0, 1, j_main + 1) #np.linspace(a, b, c) divide line ab to c-1 parts or add c points to it.
         v_manual = np.linspace(0, 1, j_main + 1)
@@ -96,14 +110,60 @@ while i_main <= max_order_elem:
                                     i_main + 1, i_main + 1, 2, 2))
         x_0_coor_all = np.zeros((number_element_v, number_element_u, i_main + 1, i_main + 1, 3)) # The initial coordinate of each element node for each element
         inital_coor_coorsys_jac = hdu.initiate_x_0_ncoorsys_jacmtx_all(surfs,\
-                                      lobatto_pw, element_boundaries_u,\
-                                   element_boundaries_v, x_0_coor_all,\
-                                  nodal_coorsys_all, jacobian_all)
+                                    lobatto_pw, element_boundaries_u,\
+                                element_boundaries_v, x_0_coor_all,\
+                                nodal_coorsys_all, jacobian_all)
         x_0_coor_all = inital_coor_coorsys_jac[0]
         nodal_coorsys_all = inital_coor_coorsys_jac[1]
         jacobian_all = inital_coor_coorsys_jac[2] #To avoide repitition calculation of Jacobian matrix, the Jacobian matrix is calculated for all elements at all GLL points
+        elem_x_0_coor_all = x_0_coor_all[0, 0]
+        elem_nodal_coorsys_all = nodal_coorsys_all[0, 0]
+        elem_jacobian_all = jacobian_all[0, 0]
+        elem_displ_all = node_displ_all[0, 0]
+        t1 = time.time()
+        k_elem = esmlrg.element_stiffness_mtx(lobatto_pw, elem_x_0_coor_all, \
+                        elem_nodal_coorsys_all, elem_jacobian_all,\
+                        elem_displ_all, elastic_modulus, nu, thk)
         
-        pass
+        
+        t2 = time.time()
+        k_global = k_elem
+        bc = gsmsml.global_boundary_condition(lobatto_pw, bc_h_bott, bc_h_top,\
+                                bc_v_left, bc_v_right, element_boundaries_u,\
+                                element_boundaries_v)
+        k_global_bc = esmsml.stiffness_matrix_bc_applied(k_elem, bc) 
+        global_load = glvsml.global_load_vector(surfs, lobatto_pw, element_boundaries_u,\
+                            element_boundaries_v, uniform_load_x,\
+                            uniform_load_y, uniform_load_z)
+        global_load_bc = np.delete(global_load, bc, 0)
+        d = np.linalg.solve(k_global_bc, global_load_bc)
+        n_dimension = k_global.shape[0]
+        displm_compelete = np.zeros(n_dimension)
+        i = 0
+        j = 0
+        while i < n_dimension:
+            if i in bc:
+                i += 1 
+            else:
+                displm_compelete[i] = d[j]
+                i += 1
+                j += 1
+        number_lobatto_node = lobatto_pw.shape[0]
+        number_node_one_row = number_element_u*(number_lobatto_node - 1) + 1
+        number_node_one_column = number_element_v*(number_lobatto_node - 1) + 1
+        node_global_a = 1 #  u = v = 0 . Four nodes at the tips of the square in u-v parametric space
+        node_global_c = node_global_a + number_element_v*(number_lobatto_node-1)\
+                            *number_node_one_row #  u = 0, v = 1
+        print('\nDisplacement ratio: {}'\
+            .format(displm_compelete[5*(node_global_c)-3]/u_analytic))
+            
+            
+        j_main += 1
+        
+    i_main += 1
+print(t2 - t1)
+subprocess.call("C:\\Nima\\N-Research\\DFG\\Python_programming\\Large_def\\1_SEMI_Large_def\\.P3-12-2\\Scripts\\snakeviz.exe process.profile ", \
+                shell=False)
                             
         
         
@@ -160,7 +220,7 @@ while i_main <= max_order_elem:
     #     if i_main in [6, 7, 8]:
     #         cond_elem[elemnum_counter] = [j_main, np.linalg.cond(k_global_bc)]
     #     elemnum_counter +=1
-        j_main += 1
+        # j_main += 1
     # # np.savetxt(f'scordelis_h_ref_displm_p_{j_main}.dat', elemnum_displm_array)
     # # np.savetxt(f'scordelis_h_ref_asmtime_p_{j_main}.dat', time_assembling)
     # # np.savetxt(f'scordelis_h_ref_solvertime_p_{j_main}.dat', time_solver)
@@ -170,7 +230,7 @@ while i_main <= max_order_elem:
     # # if j_main == max_order_elem:
     # if i_main in [6, 7, 8]:
     #         np.savetxt(f'scordelis_h_ref_cond_elem_p_{i_main}.dat', cond_elem)
-    i_main += 1
+    # i_main += 1
     # # f_global = glv.global_load_vector(surfs, lobatto_pw, element_boundaries_u, element_boundaries_v)
     # # f_global_bc = glv.load_vector_bc_applied(f_global, bc)
     # # d = np.linalg.

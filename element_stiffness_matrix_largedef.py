@@ -13,8 +13,8 @@ import global_load_vector_uniform_small as glvsml
 from geomdl import exchange
 import time as time
 
-# os.environ['OMP_NUM_THREADS'] = '3'
-# os.environ['MKL_NUM_THREADS'] = '3'
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
 
 # def jacobian_element_ncoorsys_mtx (lobatto_pw, coorsys_tanvec_mtx):
 #     '''
@@ -512,10 +512,13 @@ def m_i_mtx (h_vect, dir_t_intp, omega_intp, omega_limit=0.1):
 #     """
 #     return 1 if i == j else 0
 def accumulate_updates(k_geom, updates):
-    for (icapt, kcapt, lc1_4, lc2_5, lc3_5) in updates:
+    for (icapt, kcapt, lc1_4, lc2_5, lc3_5, lc4_3) in updates:
         k_geom[icapt:(icapt + 3), kcapt:(kcapt + 3)] = lc1_4
         k_geom[(icapt + 3):(icapt + 5), kcapt:(kcapt + 3)] = lc2_5
         k_geom[icapt:(icapt + 3), (kcapt + 3):(kcapt + 5)] = lc3_5
+        if icapt == kcapt:
+            k_geom [(icapt + 3):(icapt + 5), (kcapt + 3):(kcapt + 5)] = lc4_3
+    # print("Is k_geom contiguous?", k_geom.flags['C_CONTIGUOUS'])
     return k_geom
 
 # def elem_m_i_mtx_all() unlike elem_t_i_mtx, it seems better that m_i is constructed inside the stiffness_geom_mtx
@@ -622,14 +625,6 @@ def geom_stiffness_mtx(number_lobatto_point, lag_xi1, lag_xi2, der_lag2d_dt, \
                     #                         m22 * d_n_i_dt2 * d_n_k_dt2 + \
                     #             m12 *(d_n_i_dt1 * d_n_k_dt2 + d_n_i_dt2 * d_n_k_dt1) + \
                     #                      q1 * d_n_i_dt1 * n_k + q2 * d_n_i_dt2 * n_k) * t_k 
-                 
-                 
-                 
-                    k_geom[icapt:(icapt + 3), kcapt:(kcapt + 3)] = lc1_4
-                    k_geom[(icapt + 3):(icapt + 5), kcapt:(kcapt + 3)] = lc2_5
-                    k_geom[icapt:(icapt + 3), (kcapt + 3):(kcapt + 5)] = lc3_5
-                    # updates.append((icapt, kcapt, lc1_4, lc2_5, lc3_5))
-                    
                     
                     
                     # t4_1 = time.time()
@@ -637,12 +632,16 @@ def geom_stiffness_mtx(number_lobatto_point, lag_xi1, lag_xi2, der_lag2d_dt, \
                         lc4_1 = transp_t_3_i @ transp_hcapt_i
                         lc4_2 = hcapt_i @ t_3_i
                         lc4_3 = lc4_1 @ m_i @ lc4_2
-                        k_geom [(icapt + 3):(icapt + 5), (kcapt + 3):(kcapt + 5)] = lc4_3
+                        # k_geom [(icapt + 3):(icapt + 5), (kcapt + 3):(kcapt + 5)] = lc4_3
                     # t4_2 = time.time()
+                    # k_geom[icapt:(icapt + 3), kcapt:(kcapt + 3)] = lc1_4
+                    # k_geom[(icapt + 3):(icapt + 5), kcapt:(kcapt + 3)] = lc2_5
+                    # k_geom[icapt:(icapt + 3), (kcapt + 3):(kcapt + 5)] = lc3_5
+                    updates.append((icapt, kcapt, lc1_4, lc2_5, lc3_5, lc4_3))
                     
                     # k_geom [(icapt + 3):(icapt + 5), (kcapt + 3):(kcapt + 5)] = \
                     #                         kronecker_delta *  transp_t_3_i @ transp_hcapt_i @ m_i @ hcapt_i @ t_3_i
-    # k_geom = accumulate_updates(k_geom, updates)
+    k_geom = accumulate_updates(k_geom, updates) #For avooiding thread locking, it is tried to limit the access to large k_geom by creating it outside of the nested loops
 
     return  k_geom
                                                                                             
@@ -859,13 +858,13 @@ if __name__ =='__main__':
             elem_nodal_coorsys_all = nodal_coorsys_all[0, 0]
             elem_jacobian_all = jacobian_all[0, 0]
             elem_displ_all = node_displ_all[0, 0]
-            
+            t1 = time.time()
             k_elem = element_stiffness_mtx(lobatto_pw, elem_x_0_coor_all, \
                           elem_nodal_coorsys_all, elem_jacobian_all,\
                           elem_displ_all, elastic_modulus, nu, thk)
             
             
-            
+            t2 = time.time()
             k_global = k_elem
             bc = gsmsml.global_boundary_condition(lobatto_pw, bc_h_bott, bc_h_top,\
                                     bc_v_left, bc_v_right, element_boundaries_u,\
@@ -900,6 +899,7 @@ if __name__ =='__main__':
             j_main += 1
             
         i_main += 1
+    print(t2 - t1)
     subprocess.call("C:\\Nima\\N-Research\\DFG\\Python_programming\\Large_def\\1_SEMI_Large_def\\.P3-12-2\\Scripts\\snakeviz.exe process.profile ", \
                   shell=False)
         
