@@ -5,8 +5,10 @@ import surface_geom_SEM as sgs
 import global_stiff_matrix_small as gsmsml
 import hist_displ_mtx_update as hdu
 import element_stiff_matrix_small as esmsml
-import global_load_vector_uniform_small as glvsml
+import global_load_vector_uniform_SEMN_small as glvsml
+import global_load_vector_uniform_largedef as glvlgr
 import element_stiffness_matrix_largedef as esmlrg
+import internal_force as intf
 import cProfile
 import line_profiler as lprf
 import os
@@ -16,7 +18,7 @@ import time as time
 
 
 #INPUT *************************************************************
-u_analytic = 0.3020247
+u_analytic = 0.3020247 * 0.1 # for test I multiplied the load at line 140 by 0.1
 elastic_modulus = 4.32*10**8
 thk = 0.25
 nu = 0
@@ -57,6 +59,10 @@ c_order_u = 1 # int(input())
 print("\nEnter the order of continuity at knots to be used for auto detection of elements boundaries in v direction")
 print("The default value is '1'")
 c_order_v = 1 # int(input())
+
+number_load_step = int(input("Enter the total number of load steps  "))
+error_force = 0.01 # input("Enter the error in the length of residucal force")
+newton_rep = 100 # input("Enter the maximum steps in the Newton-Raphson")
 
 i_main = min_order_elem
 while i_main <= max_order_elem:
@@ -116,52 +122,73 @@ while i_main <= max_order_elem:
         x_0_coor_all = inital_coor_coorsys_jac[0]
         nodal_coorsys_all = inital_coor_coorsys_jac[1]
         jacobian_all = inital_coor_coorsys_jac[2] #To avoide repitition calculation of Jacobian matrix, the Jacobian matrix is calculated for all elements at all GLL points
-        elem_x_0_coor_all = x_0_coor_all[0, 0]
-        elem_nodal_coorsys_all = nodal_coorsys_all[0, 0]
-        elem_jacobian_all = jacobian_all[0, 0]
-        elem_displ_all = node_displ_all[0, 0]
-        t1 = time.time()
-        k_elem = esmlrg.element_stiffness_mtx(lobatto_pw, elem_x_0_coor_all, \
-                        elem_nodal_coorsys_all, elem_jacobian_all,\
-                        elem_displ_all, elastic_modulus, nu, thk)
+        elem_x_0_coor_all = x_0_coor_all[0, 0] #### To be changed in meshing
+        elem_nodal_coorsys_all = nodal_coorsys_all[0, 0]  #### To be changed in meshing
+        elem_jacobian_all = jacobian_all[0, 0]  #### To be changed in meshing
         
-        
-        t2 = time.time()
-        k_global = k_elem
+        t1 = time.time()      
         bc = gsmsml.global_boundary_condition(lobatto_pw, bc_h_bott, bc_h_top,\
                                 bc_v_left, bc_v_right, element_boundaries_u,\
                                 element_boundaries_v)
-        k_global_bc = esmsml.stiffness_matrix_bc_applied(k_elem, bc) 
-        global_load = glvsml.global_load_vector(surfs, lobatto_pw, element_boundaries_u,\
-                            element_boundaries_v, uniform_load_x,\
-                            uniform_load_y, uniform_load_z)
-        global_load_bc = np.delete(global_load, bc, 0)
-        d = np.linalg.solve(k_global_bc, global_load_bc)
-        n_dimension = k_global.shape[0]
-        displm_compelete = np.zeros(n_dimension)
-        i = 0
-        j = 0
-        while i < n_dimension:
-            if i in bc:
-                i += 1 
-            else:
-                displm_compelete[i] = d[j]
-                i += 1
-                j += 1
-        number_lobatto_node = lobatto_pw.shape[0]
-        number_node_one_row = number_element_u*(number_lobatto_node - 1) + 1
-        number_node_one_column = number_element_v*(number_lobatto_node - 1) + 1
-        node_global_a = 1 #  u = v = 0 . Four nodes at the tips of the square in u-v parametric space
-        node_global_c = node_global_a + number_element_v*(number_lobatto_node-1)\
-                            *number_node_one_row #  u = 0, v = 1
-        print('\nDisplacement ratio: {}'\
-            .format(displm_compelete[5*(node_global_c)-3]/u_analytic))
-            
-            
-        j_main += 1
         
-    i_main += 1
-print(t2 - t1)
+        # global_load = glvsml.global_load_vector(surfs, lobatto_pw, element_boundaries_u,\
+        #                     element_boundaries_v, uniform_load_x,\
+        #                     uniform_load_y, uniform_load_z)
+        global_total_load = glvlgr.global_load_vector(lobatto_pw, jacobian_all, \
+                               element_boundaries_u, element_boundaries_v,\
+                              uniform_load_x, uniform_load_y, uniform_load_z)
+        global_load_incr = 0.1 * global_total_load / number_load_step
+        elastic_mtx = esmlrg.elastic_matrix(elastic_modulus, nu, thk)
+        elem_displ_all = node_displ_all[0, 0]  #### To be changed in meshing
+        
+        for p_main in range(number_load_step):
+            global_stepload = (p_main + 1) * global_load_incr
+            # print(global_stepload)
+            error = 20
+            newton_step_counter = 0            
+            k_elem = esmlrg.element_stiffness_mtx(lobatto_pw, elem_x_0_coor_all, \
+                        elem_nodal_coorsys_all, elem_jacobian_all,\
+                        elem_displ_all, elastic_modulus, nu, thk) #### To be changed in meshing
+            t2 = time.time()
+            k_global = k_elem
+            k_global_bc = esmsml.stiffness_matrix_bc_applied(k_elem, bc) 
+            
+            while error >= error_force and newton_step_counter <= newton_rep:
+                global_internal_force = intf.element_intern_force(lobatto_pw, elem_x_0_coor_all, \
+                          elem_nodal_coorsys_all, elem_jacobian_all,\
+                          elem_displ_all, elastic_mtx)
+                # print(global_stepload,'\n')
+                global_res_load = global_stepload -  global_internal_force
+                # print(global_res_load,'\n')
+                
+                global_res_load_bc = np.delete( global_res_load, bc, 0)
+                error = np.linalg.norm(global_res_load_bc)
+                d = np.linalg.solve(k_global_bc, global_res_load_bc)
+                # n_dimension = k_global.shape[0]
+                # displm_compelete = np.zeros(n_dimension)
+                i = 0
+                j = 0
+                while i < total_dof:
+                    if i in bc:
+                        i += 1 
+                    else:
+                        displm_complete[i] = d[j]
+                        i += 1
+                        j += 1
+                number_lobatto_node = lobatto_pw.shape[0]
+                node_displ_all = hdu.update_displ_hist(lobatto_pw, number_element_u, number_element_v, \
+                   displm_complete, node_displ_all, nodal_coorsys_all)
+                elem_displ_all = node_displ_all[0, 0]  #### To be changed in meshing
+                print('\nDisplacement ratio: {}'\
+                    .format(displm_complete[5*(node_global_c)-3]/u_analytic))  
+                newton_step_counter += 1
+                if newton_step_counter > newton_rep:
+                    print("Not converged in defined Newton steps")
+        j_main += 1
+    i_main += 1 
+                
+                
+# print(t2 - t1)
 subprocess.call("C:\\Nima\\N-Research\\DFG\\Python_programming\\Large_def\\1_SEMI_Large_def\\.P3-12-2\\Scripts\\snakeviz.exe process.profile ", \
                 shell=False)
                             

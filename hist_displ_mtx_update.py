@@ -75,22 +75,23 @@ def update_displ_hist(lobatto_pw, number_element_u, number_element_v, \
     '''
     This functin takes the number of elements,
     complete displacement vector (displ_compl) and complete history 
-    matrix of deformation matrix (hist_displ_mtx) and update the
-    hist_mtx according to new displ_mtx calculated at each 
-    step. In addition to the displacement increment which can be directly added 
+    matrix of deformation matrix (node_displ_all) and update the
+    node_displ_all according to new displ_compl_vect calculated at each 
+    step. 
+    In addition to the displacement increment which can be directly added 
     to the previous displacement vector, it extracts the beta_1 and beta_2 increment
-    from the displ_compl and transforms them to global coordinate system by using t_3. 
-    The result is the omega increment which is added to the omega vector from the previous
+    from the displ_compl_vect and transforms them to global coordinate system by using t_3. 
+    The result is the omega increment which can be added to the omega vector from the previous
     step.
     -Output:
-    updated hist_mtx which is a (number_element*number_element)*(number_node*number_node)*(5*3)
+    updated node_displ_all which is a (number_element_u*number_element_v)*(number_node*number_node)*(2*3)
     matrix
     '''
     dim = lobatto_pw.shape[0] #number of Lobatto points
     number_element_dof = 5 * dim**2 #in local coordinate system
     # number_element_u = len(element_boundaries_u) - 1
     # number_element_v = len(element_boundaries_v) - 1
-    number_node_one_row = number_element_u*(dim - 1) + 1
+    number_node_one_row = number_element_u * (dim - 1) + 1
     # number_node_one_column = number_element_v*(dim - 1) + 1
     for i_main in range(number_element_v):
         for j_main in range(number_element_u):
@@ -108,7 +109,7 @@ def update_displ_hist(lobatto_pw, number_element_u, number_element_v, \
                     connectivity[h+4] = (5 * (node_1_number + p + s) - 1)
                 p = p + number_node_one_row
             connectivity = connectivity.astype(int)
-            print('connectivity is:\n', connectivity)
+            # print('connectivity is:\n', connectivity)
             connec_index = 0
             for m in range(dim):
                 for n in range(dim): 
