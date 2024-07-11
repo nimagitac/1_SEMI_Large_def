@@ -60,6 +60,10 @@ def initiate_x_0_ncoorsys_jacmtx_all(surface, lobatto_pw, element_boundaries_u,\
                     a_0_3 = coorsys_tanvec_mtx[r, s, 2]
                     g1 = coorsys_tanvec_mtx[r, s, 3]
                     g2 = coorsys_tanvec_mtx[r, s, 4]
+                    # if s == 2:################# MUST be deleted ONLY FOR TEST IN SCORDELIS with p = 2
+                    #     a_0_1 = np.array([1, 0, 0]) 
+                    #     a_0_3 = np.array([0, 0, 1])
+                ###################################################
                     nodal_coorsys_all[i, j, r, s, 0] = a_0_1
                     nodal_coorsys_all[i, j, r, s, 1] = a_0_2
                     nodal_coorsys_all[i, j, r, s, 2] = a_0_3
@@ -146,38 +150,7 @@ def update_displ_hist(lobatto_pw, number_element_u, number_element_v, \
                     connec_index = connec_index + 5
     return node_displ_all
             
-#    for m in range(dim):
-#                 for n in range(dim): 
-#                     node_displ_all[i_main, j_main, m, n, 3, 0] = \
-#                         node_displ_all[i_main, j_main, m, n, 3, 0] + \
-#                             displ_compl[connectivity[connec_index]]
-#                     node_displ_all[i_main, j_main, m, n, 3, 1] = \
-#                         node_displ_all[i_main, j_main, m, n, 3, 1] + \
-#                             displ_compl[connectivity[connec_index + 1]]
-#                     node_displ_all[i_main, j_main, m, n, 3, 2] = \
-#                         node_displ_all[i_main, j_main, m, n, 3, 2] + \
-#                             displ_compl[connectivity[connec_index + 2]]
-                                            
-#                     betha_1 = displ_compl[connectivity[connec_index + 3]]
-#                     betha_2 = displ_compl[connectivity[connec_index + 4]]
-#                     beta_vector = np.array([betha_1, betha_2])
-#                     omega_1_prv = node_displ_all[i_main, j_main, m, n, 4, 0]
-#                     omega_2_prv = node_displ_all[i_main, j_main, m, n, 4, 1]
-#                     omega_3_prv = node_displ_all[i_main, j_main, m, n, 4, 2]
-#                     omega_prv_step_vector =\
-#                         np.array([omega_1_prv, omega_2_prv, omega_3_prv])
-#                     a_0_1 = node_displ_all[i_main, j_main, m, n, 0]
-#                     a_0_2 = node_displ_all[i_main, j_main, m, n, 1]
-#                     delta_omega_vector = beta_to_deltaomega(a_0_1, a_0_2, omega_prv_step_vector, beta_vector)             
-                    
-#                     node_displ_all[i_main, j_main, m, n, 4, 0] = \
-#                         node_displ_all[i_main, j_main, m, n, 4, 0] + delta_omega_vector[0]
-#                     node_displ_all[i_main, j_main, m, n, 4, 1] = \
-#                         node_displ_all[i_main, j_main, m, n, 4, 1] + delta_omega_vector[1]
-#                     node_displ_all[i_main, j_main, m, n, 4, 2] = \
-#                         node_displ_all[i_main, j_main, m, n, 4, 2] + delta_omega_vector[2]
-                        
-#                     connec_index = connec_index + 5                 
+             
     
     
     

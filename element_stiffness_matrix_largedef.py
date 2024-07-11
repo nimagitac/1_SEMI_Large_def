@@ -144,6 +144,7 @@ def der_x_t_dt(number_lobatto_point, der_lag2d_dt,\
             der_x_t_dt1 = der_x_t_dt1 + der_lag2d_dt[0, icapt] * elem_x_t[i, j]
             der_x_t_dt2 = der_x_t_dt2 + der_lag2d_dt[1, icapt] * elem_x_t[i, j]
     return (der_x_t_dt1, der_x_t_dt2)
+
             
 def elem_update_dir_all(number_lobatto_point, elem_nodal_coorsys_all, elem_displ_all):
     '''
@@ -570,7 +571,7 @@ def m_i_mtx (h_vect, dir_t_intp, omega_intp, omega_limit=0.1):
     else:
         c3 = (omega_norm * np.sin(omega_norm) + 2 * (np.cos(omega_norm) -1)) / \
             (omega_norm ** 2 * (np.cos(omega_norm) - 1)) 
-        c11 = (4 * (np.cos(omega_norm)-1) + omega_norm ** 2 + omega_norm * np.sin(omega_norm))/\
+        c11 = (4 * (np.cos(omega_norm) - 1) + omega_norm ** 2 + omega_norm * np.sin(omega_norm))/\
               (2 * omega_norm ** 4 * (np.cos(omega_norm) - 1))
         c_bar10 = (np.sin(omega_norm) - omega_norm) / (2 * omega_norm * (np.cos(omega_norm) - 1))
     c10 = c_bar10 * (b_i @ omega_intp) - (dir_t_intp @ h_vect)
@@ -762,7 +763,7 @@ def element_stiffness_mtx(lobatto_pw, elem_x_0_coor_all, \
     
 
     for i in range(dim):
-        print(i, "\n")
+        # print(i, "\n")
         xi2 = lobatto_pw[i, 0]
         w2 = lobatto_pw[i, 1]
         #with open ('qsh_isoprm.dat', 'w') as qsh_file:
@@ -803,10 +804,10 @@ def element_stiffness_mtx(lobatto_pw, elem_x_0_coor_all, \
                          elem_hcapt_mtx_all, elem_t_3_mtx_all, elem_t_i_mtx_all,\
                        elem_displ_all, elem_updated_dir_all, der_xt_dt, stress_vect)
               
-            stiff_mtx = stiff_mtx + np.linalg.det(jac) * \
-                           (btr_d_b) * w1 * w2
             # stiff_mtx = stiff_mtx + np.linalg.det(jac) * \
-            #                 (btr_d_b + k_geom) * w1 * w2
+            #                (btr_d_b) * w1 * w2
+            stiff_mtx = stiff_mtx + np.linalg.det(jac) * \
+                            (btr_d_b + k_geom) * w1 * w2
     return stiff_mtx
                             
 ####################################### TEST functions ##########################################
@@ -837,7 +838,6 @@ def generate_matrix(n):
             
             
 
-    
     
     
     

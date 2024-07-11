@@ -46,21 +46,37 @@ def element_intern_force(lobatto_pw, elem_x_0_coor_all, \
                                    elem_displ_all)
             der_dirt_dt = esmlrg.der_dir_t_dt(dim, der_lag2d_dt, elem_updated_dir_all)
             der_x0_dt = esmlrg.der_x_0_dt(dim, der_lag2d_dt, elem_x_0_coor_all)
-            # b_displ = esmlrg.b_disp_mtx(lobatto_pw, lag_xi1, lag_xi2, der_lag2d_dt,\
-            #     dirct_t, der_xt_dt, der_dirt_dt, elem_t_i_mtx_all)
+            b_displ = esmlrg.b_disp_mtx(lobatto_pw, lag_xi1, lag_xi2, der_lag2d_dt,\
+                dirct_t, der_xt_dt, der_dirt_dt, elem_t_i_mtx_all)
             ####################################
              
-            b_displ = esmlrg.b_disp_mtx_0(lobatto_pw, lag_xi1, lag_xi2, der_lag2d_dt,\
-                elem_nodal_coorsys_all[i, j, 2], der_x0_dt,  der_dir0_dt,\
-                elem_t_i_0_mtx_all)
+            # b_displ = esmlrg.b_disp_mtx_0(lobatto_pw, lag_xi1, lag_xi2, der_lag2d_dt,\
+            #     elem_nodal_coorsys_all[i, j, 2], der_x0_dt,  der_dir0_dt,\
+            #     elem_t_i_0_mtx_all)
             #################################
             strain_vect = esmlrg.strain_vector (der_x0_dt, der_xt_dt, \
                    elem_nodal_coorsys_all[i, j, 2], elem_updated_dir_all[i, j], \
                    der_dir0_dt, der_dirt_dt)
+            # strain_vector_b_correct = strain_vector_by_b(dim, b_displ_correct, elem_displ_all)
+            # strain_vector_b = strain_vector_by_b(dim, b_displ, elem_displ_all)
             stress_vect = esmlrg.stress_vector(strain_vect, elastic_mtx) 
             
             elem_intern_force = elem_intern_force + \
                         np.transpose(b_displ) @ stress_vect * \
                             np.linalg.det(jac) * w1 * w2
     return elem_intern_force
+    
+    
+def strain_vector_by_b(dim, b_mtx, elem_displ_all):
+    '''
+    
+    ''' 
+    elem_displ = np.zeros(6 * dim**2)                                      
+    for i in range(dim):
+        for j in range(dim):
+            icapt = esmlrg.ij_to_icapt(dim, i, j)
+            elem_displ[5 * icapt: 5 * icapt + 3] = elem_displ_all[i, j, 0]
+            elem_displ[5 * icapt + 3: 5 * icapt + 6] = elem_displ_all[i, j, 1]
+    strain_vector_b = b_mtx @ elem_displ
+    return strain_vector_b
     

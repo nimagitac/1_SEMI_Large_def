@@ -18,7 +18,7 @@ import time as time
 
 
 #INPUT *************************************************************
-u_analytic = 0.3020247 * 0.1 # for test I multiplied the load at line 140 by 0.1
+u_analytic = 0.3020247  # for test I multiplied the load at line 140 by 0.1
 elastic_modulus = 4.32*10**8
 thk = 0.25
 nu = 0
@@ -50,7 +50,7 @@ p_3 = surfs.physical_crd(1., 1.)
 print("p_1:", p_1, "  p_2:", p_2, "  p_3:", p_3)
 
 min_order_elem = int(input("\nEnter the minimum order of elements (minimum order = 1):\n"))
-max_order_elem = min_order_elem # int(input("Enter the maximum order of elements (maximum order = 30):\n"))
+max_order_elem = int(input("Enter the maximum order of elements (maximum order = 30):\n"))
 min_number_elem = 1 # int(input("\nEnter the minimum number of elements in u and v direction:\n"))
 max_number_elem = 1 # int(input("Enter the maximum number of elements in u and v direction:\n"))
 print("\nEnter the order of continuity at knots to be used for auto detection of elements boundaries in u direction")
@@ -61,11 +61,13 @@ print("The default value is '1'")
 c_order_v = 1 # int(input())
 
 number_load_step = int(input("Enter the total number of load steps  "))
-error_force = 0.01 # input("Enter the error in the length of residucal force")
+error_force = 10**-7 # input("Enter the error in the length of residucal force")
 newton_rep = 100 # input("Enter the maximum steps in the Newton-Raphson")
 
 i_main = min_order_elem
 while i_main <= max_order_elem:
+    with open(f'scordelis_p_ref_displm_p_{i_main}_.dat', 'w') as result:
+        pass
     if i_main==1:
         lobatto_pw = lobatto_pw_all[1:3,:]
     else:
@@ -73,6 +75,7 @@ while i_main <= max_order_elem:
         lobatto_pw = lobatto_pw_all[index[0, 0] + 1:\
                             index[0, 0] + (i_main+1) + 1, :]
     j_main = min_number_elem
+    dim = lobatto_pw.shape[0]
     # elemnum_displm_array = np.zeros((max_number_elem - min_number_elem + 1, 2))
     # time_assembling = np.zeros((max_number_elem - min_number_elem + 1, 2))
     # time_solver = np.zeros((max_number_elem - min_number_elem + 1, 2))
@@ -137,32 +140,42 @@ while i_main <= max_order_elem:
         global_total_load = glvlgr.global_load_vector(lobatto_pw, jacobian_all, \
                                element_boundaries_u, element_boundaries_v,\
                               uniform_load_x, uniform_load_y, uniform_load_z)
-        global_load_incr = 0.1 * global_total_load / number_load_step
+        global_load_incr =  global_total_load / number_load_step
+        global_load_incr_bc = np.delete(global_load_incr, bc, 0)
+        global_load_incr_bc_norm = np.linalg.norm(global_load_incr_bc)
         elastic_mtx = esmlrg.elastic_matrix(elastic_modulus, nu, thk)
         elem_displ_all = node_displ_all[0, 0]  #### To be changed in meshing
         
+        error = 1
         for p_main in range(number_load_step):
+            
+            print("load step number:  ", p_main,"\n")
+            # print("error ratio:", error / global_load_incr_bc_norm,'\n\n')
             global_stepload = (p_main + 1) * global_load_incr
-            # print(global_stepload)
-            error = 20
-            newton_step_counter = 0            
+            global_stepload_bc = np.delete(global_stepload, bc, 0)
+            # print(global_stepload)            
             k_elem = esmlrg.element_stiffness_mtx(lobatto_pw, elem_x_0_coor_all, \
                         elem_nodal_coorsys_all, elem_jacobian_all,\
                         elem_displ_all, elastic_modulus, nu, thk) #### To be changed in meshing
             t2 = time.time()
             k_global = k_elem
-            k_global_bc = esmsml.stiffness_matrix_bc_applied(k_elem, bc) 
+            k_global_bc = esmsml.stiffness_matrix_bc_applied(k_elem, bc)
             
-            while error >= error_force and newton_step_counter <= newton_rep:
+            error = 10000
+            newton_step_counter = 0 
+            while (error / global_load_incr_bc_norm) >= error_force \
+                        and newton_step_counter <= newton_rep:
+                print(newton_step_counter)
                 global_internal_force = intf.element_intern_force(lobatto_pw, elem_x_0_coor_all, \
                           elem_nodal_coorsys_all, elem_jacobian_all,\
                           elem_displ_all, elastic_mtx)
                 # print(global_stepload,'\n')
+                global_internal_force_bc = np.delete(global_internal_force, bc, 0)
                 global_res_load = global_stepload -  global_internal_force
                 # print(global_res_load,'\n')
                 
                 global_res_load_bc = np.delete( global_res_load, bc, 0)
-                error = np.linalg.norm(global_res_load_bc)
+                
                 d = np.linalg.solve(k_global_bc, global_res_load_bc)
                 # n_dimension = k_global.shape[0]
                 # displm_compelete = np.zeros(n_dimension)
@@ -175,17 +188,23 @@ while i_main <= max_order_elem:
                         displm_complete[i] = d[j]
                         i += 1
                         j += 1
-                number_lobatto_node = lobatto_pw.shape[0]
                 node_displ_all = hdu.update_displ_hist(lobatto_pw, number_element_u, number_element_v, \
                    displm_complete, node_displ_all, nodal_coorsys_all)
                 elem_displ_all = node_displ_all[0, 0]  #### To be changed in meshing
-                print('\nDisplacement ratio: {}'\
-                    .format(displm_complete[5*(node_global_c)-3]/u_analytic))  
+                # print('\nDisplacement ratio: {}'\
+                #     .format(displm_complete[5*(node_global_c)-3]/u_analytic))  
+                error = np.linalg.norm(global_res_load_bc)
+                print("error ratio:", error / global_load_incr_bc_norm,'\n')
                 newton_step_counter += 1
                 if newton_step_counter > newton_rep:
                     print("Not converged in defined Newton steps")
+            step_deformation = np.array([[p_main, node_displ_all[0, 0, dim -1, 0, 0, 2]]])        
+            with open(f'scordelis_p_ref_displm_p_{i_main}_.dat', 'a') as result:
+                # result.write(f"Step {p_main}:\n")
+                np.savetxt(result, step_deformation )
         j_main += 1
-    i_main += 1 
+    i_main += 1
+    pass
                 
                 
 # print(t2 - t1)

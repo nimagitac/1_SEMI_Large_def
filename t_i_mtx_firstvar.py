@@ -96,7 +96,7 @@ def t_mtx_i (omega_vector_i, a_0_1, a_0_2, a_0_3, intersection = "false"):
             tc_1 = 1/2
             tc_2 = 1/6
         else:
-            tc_1 = (1-np.cos(omega_norm)) / omega_norm**2
+            tc_1 = (1 - np.cos(omega_norm)) / omega_norm**2
             tc_2 = (omega_norm - np.sin(omega_norm)) / omega_norm**3
             
         h_capt = unit_mtx + tc_1 * skew_omega + tc_2 * skew_omega_p2
