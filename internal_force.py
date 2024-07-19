@@ -17,10 +17,10 @@ def element_intern_force(lobatto_pw, elem_x_0_coor_all, \
     # elem_t_3_mtx_all = elem_ht3ti_mtx[1]
     elem_t_i_mtx_all = elem_ht3ti_mtx[2]
     ##################################################
-    elem_ht3ti_mtx = esmlrg.elem_hcapt_t3_ti_mtx_all(dim, elem_nodal_coorsys_all,np.zeros((dim, dim, 2, 3)))
+    # elem_ht3ti_mtx = esmlrg.elem_hcapt_t3_ti_mtx_all(dim, elem_nodal_coorsys_all,np.zeros((dim, dim, 2, 3)))
     # elem_hcatp_mtx_all = elem_ht3ti_mtx[0]
     # elem_t_3_mtx_all = elem_ht3ti_mtx[1]
-    elem_t_i_0_mtx_all = elem_ht3ti_mtx[2]
+    # elem_t_i_0_mtx_all = elem_ht3ti_mtx[2]
     #################################################
     for i in range(dim):
         # print(i, "\n")
