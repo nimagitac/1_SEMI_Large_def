@@ -64,7 +64,7 @@ newton_rep = 100 # input("Enter the maximum steps in the Newton-Raphson")
 
 i_main = min_order_elem
 while i_main <= max_order_elem:
-    with open(f'hemisphere_p_ref_displm_p_{i_main}.dat', 'w') as result:
+    with open(f'hemisphere_p_ref_displm_p_{i_main}_modifNewton.dat', 'w') as result:
         pass
     if i_main==1:
         lobatto_pw = lobatto_pw_all[1:3,:]
@@ -221,7 +221,7 @@ while i_main <= max_order_elem:
             step_deformation = np.array([[p_main, node_displ_all[0, 0, 0, 0, 0, 0]]])
             print(node_displ_all[0, 0, 0, 0, 0, 0]) 
             # print(node_displ_all[0, 0, 0, node_global_b - 1, 0, 1])        
-            with open(f'hemisphere_p_ref_displm_p_{i_main}.dat', 'a') as result:
+            with open(f'hemisphere_p_ref_displm_p_{i_main}_modifNewton.dat', 'a') as result:
                 # result.write(f"Step {p_main}:\n")
                 np.savetxt(result, step_deformation )
         j_main += 1

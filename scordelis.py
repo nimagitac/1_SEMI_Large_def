@@ -24,7 +24,7 @@ thk = 0.25
 nu = 0
 uniform_load_x = 0
 uniform_load_y = 0
-uniform_load_z = 90
+uniform_load_z = -90
 bc_h_bott = [0, 1, 0, 1, 0] #Scordelis shell. zero means clamped DOF
 bc_h_top = [1, 0, 1, 0, 1]
 bc_v_left = [1, 1, 1, 1, 1]
@@ -66,7 +66,7 @@ newton_rep = 100 # input("Enter the maximum steps in the Newton-Raphson")
 
 i_main = min_order_elem
 while i_main <= max_order_elem:
-    with open(f'scordelis_p_ref_displm_p_{i_main}_.dat', 'w') as result:
+    with open(f'scordelis_p_ref_displm_p_{i_main}_modifNewton.dat', 'w') as result:
         pass
     if i_main==1:
         lobatto_pw = lobatto_pw_all[1:3,:]
@@ -199,7 +199,7 @@ while i_main <= max_order_elem:
                 if newton_step_counter > newton_rep:
                     print("Not converged in defined Newton steps")
             step_deformation = np.array([[p_main, node_displ_all[0, 0, dim -1, 0, 0, 2]]])        
-            with open(f'scordelis_p_ref_displm_p_{i_main}_.dat', 'a') as result:
+            with open(f'scordelis_p_ref_displm_p_{i_main}_modifNewton.dat', 'a') as result:
                 # result.write(f"Step {p_main}:\n")
                 np.savetxt(result, step_deformation )
         j_main += 1
