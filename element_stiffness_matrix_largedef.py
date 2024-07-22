@@ -12,6 +12,7 @@ import global_stiff_matrix_small as gsmsml
 import global_load_vector_uniform_SEMN_small as glvsml
 from geomdl import exchange
 import time as time
+import multiprocessing as mp
 
 os.environ['OMP_NUM_THREADS'] = '1'
 os.environ['MKL_NUM_THREADS'] = '1'
