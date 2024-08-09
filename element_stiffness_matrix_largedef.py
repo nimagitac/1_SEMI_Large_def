@@ -676,7 +676,7 @@ def geom_stiffness_mtx(number_lobatto_point, lag_xi1, lag_xi2, der_lag2d_dt, \
     
     '''
     dim = number_lobatto_point
-    # k_geom = np.zeros((5 * dim**2, 5 * dim**2))
+    k_geom = np.zeros((5 * dim**2, 5 * dim**2))
     eye3 = np.eye(3)
     d_n_dt1 = der_lag2d_dt[0] # Shape function N. Referring to Gruttman 2005
     d_n_dt2 = der_lag2d_dt[1]
@@ -712,12 +712,15 @@ def geom_stiffness_mtx(number_lobatto_point, lag_xi1, lag_xi2, der_lag2d_dt, \
                     d_n_k_dt1 = d_n_dt1[kcapt]
                     d_n_k_dt2 = d_n_dt2[kcapt]
                     
+                    # pente_icapt = 5 * icapt
+                    # pente_kcapt = 5 * kcapt
+                    
                     # t1_1 = time.time()
                     lc1_1 = n11 * d_n_i_dt1 * d_n_k_dt1 
                     lc1_2 = n22 * d_n_i_dt2 * d_n_k_dt2
                     lc1_3 = n12 * (d_n_i_dt1 * d_n_k_dt2 + d_n_i_dt2 * d_n_k_dt1)
                     lc1_4 = (lc1_1 + lc1_2 +lc1_3) * eye3
-                    # k_geom[icapt:(icapt + 3), kcapt:(kcapt + 3)] = lc1_4
+                    # k_geom[pente_icapt:(pente_icapt + 3), pente_kcapt:(pente_kcapt + 3)] = lc1_4
                     # t1_2 = time.time()
                     
                     # t2_1 = time.time()                   
@@ -726,7 +729,7 @@ def geom_stiffness_mtx(number_lobatto_point, lag_xi1, lag_xi2, der_lag2d_dt, \
                     lc2_3 = m12 *(d_n_i_dt1 * d_n_k_dt2 + d_n_i_dt2 * d_n_k_dt1)
                     lc2_4 = q1 * n_i * d_n_k_dt1 + q2 * n_i * d_n_k_dt2
                     lc2_5 = transp_t_i * (lc2_1 + lc2_2 + lc2_3 + lc2_4)
-                    # k_geom[(icapt + 3):(icapt + 5), kcapt:(kcapt + 3)] = lc2_5
+                    # k_geom[(pente_icapt + 3):(pente_icapt + 5), pente_kcapt:(pente_kcapt + 3)] = lc2_5
                     # t2_2 = time.time()                      
                     
                     # k_geom[(icapt + 3):(icapt + 5), kcapt:(kcapt + 3)] = \
@@ -742,7 +745,7 @@ def geom_stiffness_mtx(number_lobatto_point, lag_xi1, lag_xi2, der_lag2d_dt, \
                     lc3_3 = lc2_3 # m12 *(d_n_i_dt1 * d_n_k_dt2 + d_n_i_dt2 * d_n_k_dt1)
                     lc3_4 = q1 * d_n_i_dt1 * n_k + q2 * d_n_i_dt2 * n_k
                     lc3_5 = (lc3_1 + lc3_2 + lc3_3 + lc3_4) * t_k
-                    # k_geom[icapt:(icapt + 3), (kcapt + 3):(kcapt + 5)] = lc3_5 
+                    # k_geom[pente_icapt:(pente_icapt + 3), (pente_kcapt + 3):(pente_kcapt + 5)] = lc3_5 
                     # t3_2 = time.time() 
                                               
                     # k_geom[icapt:(icapt + 3), (kcapt + 3):(kcapt + 5)] = \
@@ -757,7 +760,7 @@ def geom_stiffness_mtx(number_lobatto_point, lag_xi1, lag_xi2, der_lag2d_dt, \
                         lc4_1 = transp_t_3_i @ transp_hcapt_i
                         lc4_2 = hcapt_i @ t_3_i
                         lc4_3 = lc4_1 @ m_i @ lc4_2
-                        # k_geom [(icapt + 3):(icapt + 5), (kcapt + 3):(kcapt + 5)] = lc4_3
+                        # k_geom [(pente_icapt + 3):(pente_icapt + 5), (pente_kcapt + 3):(pente_kcapt + 5)] = lc4_3
                     # t4_2 = time.time()
                     # k_geom[icapt:(icapt + 3), kcapt:(kcapt + 3)] = lc1_4
                     # k_geom[(icapt + 3):(icapt + 5), kcapt:(kcapt + 3)] = lc2_5
@@ -976,7 +979,7 @@ def element_stiffness_mtx(lobatto_pw, elem_x_0_coor_all, \
     # with open ('qsh_isoprm.dat', 'w') as qsh_file:
     #     pass
     
-
+    t1 = time.time()
     for i in range(dim):
         # print(i, "\n")
         xi2 = lobatto_pw[i, 0]
@@ -1035,6 +1038,7 @@ def element_stiffness_mtx(lobatto_pw, elem_x_0_coor_all, \
             #                (btr_d_b) * w1 * w2
             stiff_mtx = stiff_mtx + np.linalg.det(jac) * \
                             (btr_d_b + k_geom) * w1 * w2
+    print("Time of calculation of K in one iteration: ", time.time()-t1)
     return stiff_mtx                                         
 
 
@@ -1157,7 +1161,7 @@ def element_stiffness_mtx_mp(lobatto_pw, elem_x_0_coor_all, \
     ''' 
     dim = lobatto_pw.shape[0]
     stiff_mtx = np.zeros((5 * dim**2, 5 * dim**2)) # 5 DOF at each node 
-    if dim <= 7:
+    if dim <= 9:
         stiff_mtx = element_stiffness_mtx(lobatto_pw, elem_x_0_coor_all, \
                           elem_nodal_coorsys_all, elem_jacobian_all,\
                           elem_displ_all, elastic_modulus, nu, thk )
