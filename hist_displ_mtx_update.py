@@ -75,7 +75,7 @@ def initiate_x_0_ncoorsys_jacmtx_all(surface, lobatto_pw, element_boundaries_u,\
 
 
 def update_displ_hist(lobatto_pw, number_element_u, number_element_v, \
-                   displ_compl_vect, node_displ_all, nodal_coorsys_all):
+                   nodal_coorsys_all, displ_compl_vect, node_displ_all):
     '''
     This functin takes the number of elements,
     complete displacement vector (displ_compl) and complete history 

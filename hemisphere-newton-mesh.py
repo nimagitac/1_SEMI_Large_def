@@ -5,18 +5,22 @@ import surface_geom_SEM as sgs
 import global_stiff_matrix_small as gsmsml
 import hist_displ_mtx_update as hdu
 import element_stiff_matrix_small as esmsml
-import global_load_vector_uniform_SEMN_small as glvsml
-import global_load_vector_uniform_largedef as glvlgr
 import element_stiffness_matrix_largedef as esmlrg
+import global_stiff_matrix_largedef as gsmlrg
 import internal_force as intf
 import cProfile
 import line_profiler as lprf
 import os
 import subprocess
 import time as time
+import sys
 
 if __name__ == "__main__":
-
+    RED = '\033[91m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RESET = '\033[0m'
+    CYAN = '\033[36m'
     #INPUT *************************************************************
     u_analytic = 5.86799
     elastic_modulus = 6.825*(10**7)
@@ -49,8 +53,8 @@ if __name__ == "__main__":
 
     min_order_elem = int(input("\nEnter the minimum order of elements (minimum order = 1):\n"))
     max_order_elem = int(input("Enter the maximum order of elements (maximum order = 30):\n"))
-    min_number_elem = 1 # int(input("\nEnter the minimum number of elements in u and v direction:\n"))
-    max_number_elem = 1 # int(input("Enter the maximum number of elements in u and v direction:\n"))
+    min_number_elem = int(input("\nEnter the minimum number of elements in u and v direction:\n"))
+    max_number_elem = int(input("Enter the maximum number of elements in u and v direction:\n"))
     print("\nEnter the order of continuity at knots to be used for auto detection of elements boundaries in u direction")
     print("The default value is '1'")
     c_order_u = 1 # int(input())
@@ -60,11 +64,11 @@ if __name__ == "__main__":
 
     number_load_step = int(input("Enter the total number of load steps  "))
     error_force = 10**-5 # input("Enter the error in the length of residucal force")
-    newton_rep = 100 # input("Enter the maximum steps in the Newton-Raphson")
+    newton_iter_max = 100 # input("Enter the maximum steps in the Newton-Raphson")
 
     i_main = min_order_elem
     while i_main <= max_order_elem:
-        with open(f'hemisphere_p_ref_displm_p_{i_main}_newton.dat', 'w') as result:
+        with open(f'hemisphere_displm_p_{i_main}.dat', 'w') as result:
             pass
         if i_main==1:
             lobatto_pw = lobatto_pw_all[1:3,:]
@@ -74,18 +78,17 @@ if __name__ == "__main__":
                                 index[0, 0] + (i_main+1) + 1, :]
         j_main = min_number_elem
         dim = lobatto_pw.shape[0]
-        # elemnum_displm_array = np.zeros((max_number_elem - min_number_elem + 1, 2))
-        # time_assembling = np.zeros((max_number_elem - min_number_elem + 1, 2))
-        # time_solver = np.zeros((max_number_elem - min_number_elem + 1, 2))
-        # dof_displm_array = np.zeros((max_number_elem - min_number_elem + 1, 2)) 
-        # dof_time_assembling = np.zeros((max_number_elem - min_number_elem + 1, 2)) 
-        # dof_time_solver = np.zeros((max_number_elem - min_number_elem + 1, 2)) 
-        # cond_elem =np.zeros((max_number_elem - min_number_elem + 1, 2)) 
         elemnum_counter = 0
         while j_main <= max_number_elem:
-            print("\n\n\nNumber of elements manually given in u and v: {}    Order of elements: {} ".\
-            format(str(j_main)+'x'+str(j_main), i_main))
-            print("\nProgram starts to generate mesh according to continuity at knots and manual input of number of elements ...") 
+            # with open(f'scordelis_displm_p_{i_main}.dat', 'w') as result:
+            #     pass
+            print("\n\n*************************************************************************")
+            print("*************************************************************************\n")
+            print("Number of elements manually given in u and v: {}    Order of elements: {} ".\
+            format(str(j_main)+'x'+ str(j_main), i_main))
+            print("Program starts to generate mesh according to continuity at knots and manual input of number of elements ...") 
+            print("\n*************************************************************************")
+            print("*************************************************************************\n\n")
             u_manual = np.linspace(0, 1, j_main + 1) #np.linspace(a, b, c) divide line ab to c-1 parts or add c points to it.
             v_manual = np.linspace(0, 1, j_main + 1)
             mesh = gsmsml.mesh_func(surfs, u_manual, v_manual, c_order_u, c_order_v)
@@ -123,11 +126,8 @@ if __name__ == "__main__":
             x_0_coor_all = inital_coor_coorsys_jac[0]
             nodal_coorsys_all = inital_coor_coorsys_jac[1]
             jacobian_all = inital_coor_coorsys_jac[2] #To avoide repitition calculation of Jacobian matrix, the Jacobian matrix is calculated for all elements at all GLL points
-            elem_x_0_coor_all = x_0_coor_all[0, 0] #### To be changed in meshing
-            elem_nodal_coorsys_all = nodal_coorsys_all[0, 0]  #### To be changed in meshing
-            elem_jacobian_all = jacobian_all[0, 0]  #### To be changed in meshing
-            
-            t1 = time.time()      
+           
+            # t1 = time.time()      
             bc = gsmsml.global_boundary_condition(lobatto_pw, bc_h_bott, bc_h_top,\
                                     bc_v_left, bc_v_right, element_boundaries_u,\
                                     element_boundaries_v)
@@ -136,12 +136,6 @@ if __name__ == "__main__":
             bc = np.sort(bc)
             
         
-            # global_total_load = glvlgr.global_load_vector(lobatto_pw, jacobian_all, \
-            #                        element_boundaries_u, element_boundaries_v,\
-            #                       uniform_load_x, uniform_load_y, uniform_load_z)
-            # global_load_incr =  global_total_load / number_load_step
-            # global_load_incr_bc = np.delete(global_load_incr, bc, 0)
-            # global_load_incr_bc_norm = np.linalg.norm(global_load_incr_bc)
             
             global_total_load = np.zeros(total_dof)
             global_total_load[0] = point_load
@@ -152,8 +146,8 @@ if __name__ == "__main__":
             
             elastic_mtx = esmlrg.elastic_matrix(elastic_modulus, nu, thk)
             elem_displ_all = node_displ_all[0, 0]  #### To be changed in meshing
+            newton_iter_counter_total = 0
             
-            # error = 1
             for p_main in range(number_load_step):
                 print("\n\n******************************************")
                 print("\nload step number:  ", p_main,"\n")
@@ -171,23 +165,26 @@ if __name__ == "__main__":
             
                 
                 error = 10000
-                newton_step_counter = 0 
+                newton_iter_counter = 0 
                 
-                while (error /  global_load_step_bc_norm) >= error_force \
-                            and newton_step_counter <= newton_rep:
+                while (error /  global_load_step_bc_norm) >= error_force:
                                 
-                    print("\n Newton iteration number:", newton_step_counter)
+                    print(f"{GREEN}{j_main}x{j_main}-p{i_main}")
+                    print(f"{YELLOW}load step number:  ", p_main)           
+                    print(f"{CYAN}Newton iteration number:", newton_iter_counter,f"{RESET}")
                                 
-                    k_elem = esmlrg.element_stiffness_mtx_mp(lobatto_pw, elem_x_0_coor_all, \
-                            elem_nodal_coorsys_all, elem_jacobian_all,\
-                            elem_displ_all, elastic_modulus, nu, thk) #### To be changed in meshing
-                    k_global = k_elem
-                    k_global_bc = esmsml.stiffness_matrix_bc_applied(k_elem, bc)
+                    k_global =gsmlrg.global_stiffness_matrix(lobatto_pw,\
+                            element_boundaries_u, element_boundaries_v,
+                            x_0_coor_all, nodal_coorsys_all, jacobian_all,
+                            node_displ_all, elastic_modulus, nu, thk)
+                                     
+                    k_global_bc = esmsml.stiffness_matrix_bc_applied(k_global, bc)
                                 
                     
-                    global_internal_force = intf.element_intern_force(lobatto_pw, elem_x_0_coor_all, \
-                            elem_nodal_coorsys_all, elem_jacobian_all,\
-                            elem_displ_all, elastic_mtx)
+                    global_internal_force = intf.global_intern_force(lobatto_pw, \
+                                    element_boundaries_u, element_boundaries_v,\
+                                    x_0_coor_all, nodal_coorsys_all, jacobian_all,\
+                                    node_displ_all, elastic_mtx)
                     # print(global_stepload,'\n')
                     global_internal_force_bc = np.delete(global_internal_force, bc, 0)
                     global_res_load = global_load_incr -  global_internal_force
@@ -208,22 +205,33 @@ if __name__ == "__main__":
                             i += 1
                             j += 1
                     node_displ_all = hdu.update_displ_hist(lobatto_pw, number_element_u, number_element_v, \
-                    displm_complete, node_displ_all, nodal_coorsys_all)
+                    nodal_coorsys_all, displm_complete, node_displ_all)
                     elem_displ_all = node_displ_all[0, 0]  #### To be changed in meshing
                     # print('\nDisplacement ratio: {}'\
                     #     .format(displm_complete[5*(node_global_c)-3]/u_analytic))  
                     error = np.linalg.norm(global_res_load_bc)
-                    print("error ratio:", error /  global_load_step_bc_norm,'\n')
-                    # print(node_displ_all[0, 0, 0, 0, 0, 0])
-                    newton_step_counter += 1
-                    if newton_step_counter > newton_rep:
+                    print("Error ratio:", error / global_load_step_bc_norm)
+                    # print(displm_complete[5*(node_global_c)-3],"\n")
+                    print('Displacement:', node_displ_all[0, 0, 0, 0, 0, 0],"\n\n")
+                    newton_iter_counter += 1
+                    if newton_iter_counter > newton_iter_max:
                         print("Not converged in defined Newton steps")
-                step_deformation = np.array([[p_main, node_displ_all[0, 0, 0, 0, 0, 0]]])
-                print(node_displ_all[0, 0, 0, 0, 0, 0]) 
+                        sys.exit()
+                newton_iter_counter_total += newton_iter_counter
+                # step_deformation = np.array([[p_main, node_displ_all[0, 0, 0, 0, 0, 0]]])
+                # print(node_displ_all[0, 0, 0, 0, 0, 0]) 
                 # print(node_displ_all[0, 0, 0, node_global_b - 1, 0, 1])        
-                with open(f'hemisphere_p_ref_displm_p_{i_main}_newton.dat', 'a') as result:
-                    # result.write(f"Step {p_main}:\n")
-                    np.savetxt(result, step_deformation )
+                # with open(f'hemisphere_p_ref_displm_p_{i_main}_newton.dat', 'a') as result:
+                #     # result.write(f"Step {p_main}:\n")
+                #     np.savetxt(result, step_deformation )
+            output_array = np.array([[i_main, j_main, j_main**2, \
+                            global_res_load_bc.shape[0],\
+                            node_displ_all[0, 0, 0, 0, 0, 0],\
+                            node_displ_all[0, 0, 0, 0, 0, 0]/u_analytic,\
+                            newton_iter_counter_total]])  
+            with open(f'hemisphere_displm_p_{i_main}.dat', 'a') as result:
+                #     # result.write(f"Step {p_main}:\n")
+                np.savetxt(result, output_array, fmt='%d %d %d %d %.10f %.10f %d')  
             j_main += 1
         i_main += 1
         pass
