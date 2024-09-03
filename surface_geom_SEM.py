@@ -287,7 +287,7 @@ if __name__ == '__main__':
     os.system('cls')
     u = 0.001
     v = 0.001       
-    data = exchange.import_json("sphere_clean_notrim.json") #sphere_clean_2 generic_shell_kninsertion_sense_True square square_kninsertion generic_shell_kninsertion foursided_curved_kninsertion foursided_curved_kninsertion2  rectangle_kninsertion
+    data = exchange.import_json("half-circle.json") #sphere_clean_2 generic_shell_kninsertion_sense_True square square_kninsertion generic_shell_kninsertion foursided_curved_kninsertion foursided_curved_kninsertion2  rectangle_kninsertion
     visualization(data)
     surfs = SurfaceGeo(data, 0, 1)
 
