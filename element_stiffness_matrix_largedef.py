@@ -646,7 +646,7 @@ def geom_stiffness_mtx(number_lobatto_point, lag_xi1, lag_xi2, der_lag2d_dt, \
                                                 
 ##############################################################################################################
 # @lprf.profile
-@profile
+# @profile
 def element_stiffness_mtx(lobatto_pw, elem_x_0_coor_all, \
                           elem_nodal_coorsys_all, elem_jacobian_all,\
                           elem_displ_all, elastic_modulus, nu, thk ):

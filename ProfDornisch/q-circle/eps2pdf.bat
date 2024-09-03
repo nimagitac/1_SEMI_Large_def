@@ -1,0 +1,1 @@
+FOR %%a in (*.eps) DO (ps2pdf -dEPSCrop %%~na.eps %%~na.pdf)
