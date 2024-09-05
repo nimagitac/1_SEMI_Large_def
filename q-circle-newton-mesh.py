@@ -10,6 +10,7 @@ import global_load_vector_uniform_largedef as glvlgr
 import element_stiffness_matrix_largedef as esmlrg
 import global_stiff_matrix_largedef as gsmlrg
 import internal_force as intf
+import stress_strain as strsn
 import cProfile
 import line_profiler as lprf
 import os
@@ -62,6 +63,7 @@ if __name__ == "__main__":
     c_order_v = 1 #int(input())
 
     number_load_step = int(input("Enter the total number of load steps  "))
+    stress_calc = input("If the stress/strain should be calculated as the output press y\n")
     error_force = 10**-5 # input("Enter the error in the length of residucal force")
     newton_iter_max = 100 # input("Enter the maximum steps in the Newton-Raphson")
 
@@ -70,6 +72,8 @@ if __name__ == "__main__":
         with open(f'q_circle_displm_p_{i_main}.dat', 'w') as result:
             pass
         with open(f'q_circle_jacobian_{i_main}.dat', 'w') as jac:
+            pass
+        with open(f'q_circle_stress_{i_main}.dat','w') as st:
             pass
         if i_main==1:
             lobatto_pw = lobatto_pw_all[1:3,:]
@@ -94,7 +98,7 @@ if __name__ == "__main__":
             v_manual = np.linspace(0, 1, j_main + 1)
             mesh = gsmsml.mesh_func(surfs, u_manual, v_manual, c_order_u, c_order_v)
             element_boundaries_u = mesh[0]
-            element_boundaries_v = np.array([0, 0.5, 1])#mesh[1]
+            element_boundaries_v = np.array([0, 0.5, 1])#np.array([0, 0.45, 0.5, 0.55, 1])#mesh[1]
             
             bc = gsmsml.global_boundary_condition(lobatto_pw, bc_h_bott, bc_h_top,\
                                             bc_v_left, bc_v_right, element_boundaries_u,\
@@ -200,7 +204,7 @@ if __name__ == "__main__":
                     error = np.linalg.norm(global_res_load_bc)
                     print("Error ratio:", error / global_load_incr_bc_norm)
                     # print(displm_complete[5*(node_global_c)-3],"\n")
-                    print('Displacement:', node_displ_all[1, 0, dim-1, dim-1, 0, 2],"\n\n")
+                    print('Displacement:', node_displ_all[number_element_v-1, 0, dim-1, dim-1, 0, 2],"\n\n")
                     newton_iter_counter += 1
                     if newton_iter_counter > newton_iter_max:
                         print("Not converged in the defined number of Newton steps")
@@ -214,13 +218,24 @@ if __name__ == "__main__":
                             number_element_v,\
                             (number_element_u) * (number_element_v), \
                             global_res_load_bc.shape[0],\
-                            node_displ_all[1, 0, dim-1, dim-1, 0, 2],\
-                            node_displ_all[1, 0, dim-1, dim-1, 0, 2]/u_analytic,\
+                            node_displ_all[number_element_v-1, 0, dim-1, dim-1, 0, 2],\
+                            node_displ_all[number_element_v-1, 0, dim-1, dim-1, 0, 2]/u_analytic,\
                             newton_iter_counter_total]])  
             with open(f'q_circle_displm_p_{i_main}.dat', 'a') as result:
                 #     # result.write(f"Step {p_main}:\n")
                 np.savetxt(result, output_array, fmt='%d %d %d %d %d %.10f %.10f %d') 
-            
+            if stress_calc =='y':
+                str_mtx = strsn.stress_mtx_all(lobatto_pw, number_element_u, number_element_v, \
+                        x_0_coor_all, nodal_coorsys_all, jacobian_all, node_displ_all, \
+                        elastic_modulus, nu, thk)
+                with open(f'q_circle_stress_{i_main}.dat','a') as st:
+                    for k in range(number_element_v):
+                        for i in range(dim):
+                            for j in range(dim):
+                                np.savetxt(st, str_mtx[k, 0, i, j, 0])
+                                st.write("\n")
+                        st.write("\n\n\n\n")
+                
             j_main += 1
         i_main += 2
         pass
